@@ -40,39 +40,20 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
 export default function CustomFrequencyWireframe() {
   const [jobFrequency, setJobFrequency] = useState("Daily");
   const [rows, setRows] = useState([
-    {
-      id: uid(),
-      start: "",
-      end: "",
-      freq: "Weekly",
-      monthlyDay: "",
-      monthlyInterval: "1",
-      weeklyDays: [],
-      yearlyDay: "",
-      yearlyMonth: "",
-    },
+    { id: uid(), start: "", end: "", freq: "Weekly", monthlyDay: "", monthlyInterval: "1", weeklyDays: [], yearlyDay: "", yearlyMonth: "" },
   ]);
-
   const [mainMonthlyDay, setMainMonthlyDay] = useState("");
   const [mainMonthlyInterval, setMainMonthlyInterval] = useState("1");
   const [mainWeeklyDays, setMainWeeklyDays] = useState([]);
   const [mainYearlyDay, setMainYearlyDay] = useState("");
   const [mainYearlyMonth, setMainYearlyMonth] = useState("");
+  const [mainStart, setMainStart] = useState("");
+  const [mainEnd, setMainEnd] = useState("");
 
   const addRow = () => {
     setRows((r) => [
       ...r,
-      {
-        id: uid(),
-        start: "",
-        end: "",
-        freq: "Weekly",
-        monthlyDay: "",
-        monthlyInterval: "1",
-        weeklyDays: [],
-        yearlyDay: "",
-        yearlyMonth: "",
-      },
+      { id: uid(), start: "", end: "", freq: "Weekly", monthlyDay: "", monthlyInterval: "1", weeklyDays: [], yearlyDay: "", yearlyMonth: "" },
     ]);
   };
 
@@ -84,21 +65,14 @@ export default function CustomFrequencyWireframe() {
     setRows((r) =>
       r.map((x) =>
         x.id === id
-          ? {
-              ...x,
-              weeklyDays: (x.weeklyDays || []).includes(day)
-                ? x.weeklyDays.filter((d) => d !== day)
-                : [...(x.weeklyDays || []), day],
-            }
+          ? { ...x, weeklyDays: (x.weeklyDays || []).includes(day) ? x.weeklyDays.filter((d) => d !== day) : [...(x.weeklyDays || []), day] }
           : x
       )
     );
   };
 
   const toggleMainWeekday = (day) => {
-    setMainWeeklyDays((arr) =>
-      arr.includes(day) ? arr.filter((d) => d !== day) : [...arr, day]
-    );
+    setMainWeeklyDays((arr) => (arr.includes(day) ? arr.filter((d) => d !== day) : [...arr, day]));
   };
 
   const updateRow = (id, field, value) => {
@@ -162,21 +136,25 @@ export default function CustomFrequencyWireframe() {
 
   const handleSubmit = () => {
     if (jobFrequency !== "Custom") {
-      const mainPayload = { jobFrequency };
+      if (!mainStart || !mainEnd) {
+        alert("Please select start and end dates.");
+        return;
+      }
+      const s = toDate(mainStart);
+      const e = toDate(mainEnd);
+      if (s && e && e < s) {
+        alert("End date must be on/after start date.");
+        return;
+      }
+      const mainPayload = { jobFrequency, start: mainStart, end: mainEnd };
       if (jobFrequency === "Monthly") {
-        mainPayload.monthly = {
-          day: mainMonthlyDay,
-          intervalMonths: mainMonthlyInterval,
-        };
+        mainPayload.monthly = { day: mainMonthlyDay, intervalMonths: mainMonthlyInterval };
       }
       if (jobFrequency === "Weekly") {
         mainPayload.weekly = { days: mainWeeklyDays };
       }
       if (jobFrequency === "Yearly") {
-        mainPayload.yearly = {
-          day: mainYearlyDay,
-          month: mainYearlyMonth,
-        };
+        mainPayload.yearly = { day: mainYearlyDay, month: mainYearlyMonth };
       }
       alert("Saved! Check console for payload.");
       console.log("Payload", mainPayload);
@@ -225,9 +203,24 @@ export default function CustomFrequencyWireframe() {
                 </div>
               </div>
             </div>
-
             {jobFrequency !== "Custom" && (
               <div className="mt-4 space-y-3 text-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="date"
+                    value={mainStart}
+                    onChange={(e) => setMainStart(e.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    aria-label="Start date"
+                  />
+                  <input
+                    type="date"
+                    value={mainEnd}
+                    onChange={(e) => setMainEnd(e.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    aria-label="End date"
+                  />
+                </div>
                 {jobFrequency === "Monthly" && (
                   <div className="flex flex-wrap items-center gap-2">
                     <span>On day</span>
@@ -371,7 +364,6 @@ export default function CustomFrequencyWireframe() {
                       </button>
                     </div>
                   </div>
-
                   {row.freq === "Monthly" && (
                     <div className="mt-3 text-sm flex flex-wrap items-center gap-2">
                       <span>On day</span>
@@ -398,7 +390,6 @@ export default function CustomFrequencyWireframe() {
                       <span>month(s)</span>
                     </div>
                   )}
-
                   {row.freq === "Weekly" && (
                     <div className="mt-3 text-sm flex flex-wrap items-center gap-3">
                       {WEEKDAYS.map((d) => (
@@ -415,7 +406,6 @@ export default function CustomFrequencyWireframe() {
                       ))}
                     </div>
                   )}
-
                   {row.freq === "Yearly" && (
                     <div className="mt-3 text-sm flex flex-wrap items-center gap-2">
                       <span>On the</span>
@@ -442,7 +432,6 @@ export default function CustomFrequencyWireframe() {
                       </select>
                     </div>
                   )}
-
                   {validation[row.id] && (
                     <ul className="mt-2 text-xs text-red-600 list-disc list-inside">
                       {validation[row.id].map((e, i) => (
@@ -453,7 +442,6 @@ export default function CustomFrequencyWireframe() {
                 </div>
               ))}
             </div>
-            
             <div className="px-5 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="text-xs text-gray-600">• Ranges must not overlap • End date must be on/after start date</div>
               <div className="flex gap-3">
@@ -463,6 +451,12 @@ export default function CustomFrequencyWireframe() {
                   title={hasErrors ? "Fix validation issues to enable saving" : "Save configuration"}
                 >
                   Save Configuration
+                </button>
+                <button
+                  onClick={() => console.log("Preview data", { jobFrequency, rows })}
+                  className="rounded-md border border-slate-300 text-slate-800 px-4 py-2 text-sm hover:bg-slate-50"
+                >
+                  Preview Data
                 </button>
               </div>
             </div>
@@ -474,14 +468,9 @@ export default function CustomFrequencyWireframe() {
             <div className="px-5 py-4">
               <div className="text-sm text-gray-700">Selected frequency: <b>{jobFrequency}</b></div>
               <div className="mt-3 flex gap-3">
+                <button onClick={handleSubmit} className="rounded-md px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700">Save</button>
                 <button
-                  onClick={handleSubmit}
-                  className="rounded-md px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => console.log("Preview data", { jobFrequency, mainMonthlyDay, mainMonthlyInterval, mainWeeklyDays, mainYearlyDay, mainYearlyMonth })}
+                  onClick={() => console.log("Preview data", { jobFrequency, mainStart, mainEnd, mainMonthlyDay, mainMonthlyInterval, mainWeeklyDays, mainYearlyDay, mainYearlyMonth })}
                   className="rounded-md border border-slate-300 text-slate-800 px-4 py-2 text-sm hover:bg-slate-50"
                 >
                   Preview Data
