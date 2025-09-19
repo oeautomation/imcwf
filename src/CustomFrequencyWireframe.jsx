@@ -453,6 +453,7 @@ export default function CustomFrequencyWireframe() {
                 </div>
               ))}
             </div>
+            
             <div className="px-5 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="text-xs text-gray-600">• Ranges must not overlap • End date must be on/after start date</div>
               <div className="flex gap-3">
