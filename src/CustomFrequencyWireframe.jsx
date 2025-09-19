@@ -463,11 +463,6 @@ export default function CustomFrequencyWireframe() {
                 >
                   Save Configuration
                 </button>
-                <button
-                  className="rounded-md border border-slate-300 text-slate-800 px-4 py-2 text-sm hover:bg-slate-50"
-                >
-                  Preview Data
-                </button>
               </div>
             </div>
           </section>
