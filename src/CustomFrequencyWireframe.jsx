@@ -18,6 +18,7 @@ const MONTHS = [
 ];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+
 function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
