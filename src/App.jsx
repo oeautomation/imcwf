@@ -17,7 +17,7 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="//customfreq" element={<CustomFrequencyWireframe />} />
+        <Route path="/customfreq" element={<CustomFrequencyWireframe />} />
       </Routes>
     </HashRouter>
   );
