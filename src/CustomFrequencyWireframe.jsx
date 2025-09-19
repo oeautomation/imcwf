@@ -166,6 +166,8 @@ export default function CustomFrequencyWireframe() {
     }
     const payload = {
       jobFrequency,
+      start: mainStart,
+      end: mainEnd,
       customRanges: rows.map((r) => ({
         start: r.start,
         end: r.freq === "One time" ? r.start : r.end,
@@ -203,94 +205,98 @@ export default function CustomFrequencyWireframe() {
                 </div>
               </div>
             </div>
-            {jobFrequency !== "Custom" && (
-              <div className="mt-4 space-y-3 text-sm">
-                <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="date"
-                    value={mainStart}
-                    onChange={(e) => setMainStart(e.target.value)}
-                    className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    aria-label="Start date"
-                  />
-                  <input
-                    type="date"
-                    value={mainEnd}
-                    onChange={(e) => setMainEnd(e.target.value)}
-                    className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    aria-label="End date"
-                  />
-                </div>
-                {jobFrequency === "Monthly" && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span>On day</span>
-                    <select
-                      className="rounded-md border border-gray-300 px-2 py-1"
-                      value={mainMonthlyDay}
-                      onChange={(e) => setMainMonthlyDay(e.target.value)}
-                    >
-                      <option value="">Select</option>
-                      {DAYS_1_31.map((d) => (
-                        <option key={d} value={String(d)}>{d}</option>
-                      ))}
-                    </select>
-                    <span>of every</span>
-                    <select
-                      className="rounded-md border border-gray-300 px-2 py-1"
-                      value={mainMonthlyInterval}
-                      onChange={(e) => setMainMonthlyInterval(e.target.value)}
-                    >
-                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                    <span>month(s)</span>
-                  </div>
-                )}
-                {jobFrequency === "Weekly" && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    {WEEKDAYS.map((d) => (
-                      <label key={d} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
-                        mainWeeklyDays.includes(d) ? "bg-indigo-50 border-indigo-300" : "border-gray-300"
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={mainWeeklyDays.includes(d)}
-                          onChange={() => toggleMainWeekday(d)}
-                        />
-                        <span>{d}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {jobFrequency === "Yearly" && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span>On the</span>
-                    <select
-                      className="rounded-md border border-gray-300 px-2 py-1"
-                      value={mainYearlyDay}
-                      onChange={(e) => setMainYearlyDay(e.target.value)}
-                    >
-                      <option value="">Day</option>
-                      {DAYS_1_31.map((d) => (
-                        <option key={d} value={String(d)}>{d}</option>
-                      ))}
-                    </select>
-                    <span>of</span>
-                    <select
-                      className="rounded-md border border-gray-300 px-2 py-1"
-                      value={mainYearlyMonth}
-                      onChange={(e) => setMainYearlyMonth(e.target.value)}
-                    >
-                      <option value="">Month</option>
-                      {MONTHS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="text-sm">Job start date</label>
+                <input
+                  type="date"
+                  value={mainStart}
+                  onChange={(e) => setMainStart(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Job start date"
+                />
+                <label className="text-sm">Job end date</label>
+                <input
+                  type="date"
+                  value={mainEnd}
+                  onChange={(e) => setMainEnd(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  aria-label="Job end date"
+                />
               </div>
-            )}
+
+              {jobFrequency === "Monthly" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>On day</span>
+                  <select
+                    className="rounded-md border border-gray-300 px-2 py-1"
+                    value={mainMonthlyDay}
+                    onChange={(e) => setMainMonthlyDay(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    {DAYS_1_31.map((d) => (
+                      <option key={d} value={String(d)}>{d}</option>
+                    ))}
+                  </select>
+                  <span>of every</span>
+                  <select
+                    className="rounded-md border border-gray-300 px-2 py-1"
+                    value={mainMonthlyInterval}
+                    onChange={(e) => setMainMonthlyInterval(e.target.value)}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <span>month(s)</span>
+                </div>
+              )}
+
+              {jobFrequency === "Weekly" && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {WEEKDAYS.map((d) => (
+                    <label key={d} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
+                      mainWeeklyDays.includes(d) ? "bg-indigo-50 border-indigo-300" : "border-gray-300"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={mainWeeklyDays.includes(d)}
+                        onChange={() => toggleMainWeekday(d)}
+                      />
+                      <span>{d}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {jobFrequency === "Yearly" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>On the</span>
+                  <select
+                    className="rounded-md border border-gray-300 px-2 py-1"
+                    value={mainYearlyDay}
+                    onChange={(e) => setMainYearlyDay(e.target.value)}
+                  >
+                    <option value="">Day</option>
+                    {DAYS_1_31.map((d) => (
+                      <option key={d} value={String(d)}>{d}</option>
+                    ))}
+                  </select>
+                  <span>of</span>
+                  <select
+                    className="rounded-md border border-gray-300 px-2 py-1"
+                    value={mainYearlyMonth}
+                    onChange={(e) => setMainYearlyMonth(e.target.value)}
+                  >
+                    <option value="">Month</option>
+                    {MONTHS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
