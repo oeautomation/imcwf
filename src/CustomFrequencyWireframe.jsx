@@ -1,6 +1,22 @@
 import React, { useMemo, useState } from "react";
 
-const FREQ_OPTIONS = ["Daily", "Weekly", "Monthly", "Fortnight", "One time"];
+const FREQ_OPTIONS = ["Daily", "Weekly", "Monthly", "Yearly", "Fortnight", "One time"];
+const DAYS_1_31 = Array.from({ length: 31 }, (_, i) => i + 1);
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -23,14 +39,66 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
 
 export default function CustomFrequencyWireframe() {
   const [jobFrequency, setJobFrequency] = useState("Daily");
-  const [rows, setRows] = useState([{ id: uid(), start: "", end: "", freq: "Weekly" }]);
+  const [rows, setRows] = useState([
+    {
+      id: uid(),
+      start: "",
+      end: "",
+      freq: "Weekly",
+      monthlyDay: "",
+      monthlyInterval: "1",
+      weeklyDays: [],
+      yearlyDay: "",
+      yearlyMonth: "",
+    },
+  ]);
+
+  const [mainMonthlyDay, setMainMonthlyDay] = useState("");
+  const [mainMonthlyInterval, setMainMonthlyInterval] = useState("1");
+  const [mainWeeklyDays, setMainWeeklyDays] = useState([]);
+  const [mainYearlyDay, setMainYearlyDay] = useState("");
+  const [mainYearlyMonth, setMainYearlyMonth] = useState("");
 
   const addRow = () => {
-    setRows((r) => [...r, { id: uid(), start: "", end: "", freq: "Weekly" }]);
+    setRows((r) => [
+      ...r,
+      {
+        id: uid(),
+        start: "",
+        end: "",
+        freq: "Weekly",
+        monthlyDay: "",
+        monthlyInterval: "1",
+        weeklyDays: [],
+        yearlyDay: "",
+        yearlyMonth: "",
+      },
+    ]);
   };
 
   const removeRow = (id) => {
     setRows((r) => r.filter((x) => x.id !== id));
+  };
+
+  const toggleRowWeekday = (id, day) => {
+    setRows((r) =>
+      r.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              weeklyDays: (x.weeklyDays || []).includes(day)
+                ? x.weeklyDays.filter((d) => d !== day)
+                : [...(x.weeklyDays || []), day],
+            }
+          : x
+      )
+    );
+  };
+
+  const toggleMainWeekday = (day) => {
+    setMainWeeklyDays((arr) =>
+      arr.includes(day) ? arr.filter((d) => d !== day) : [...arr, day]
+    );
   };
 
   const updateRow = (id, field, value) => {
@@ -60,6 +128,17 @@ export default function CustomFrequencyWireframe() {
       if (row.freq !== "One time" && !row.end) rowErrors.push("End date is required");
       if (s && e && e < s) rowErrors.push("End date must be on/after start date");
       if (!FREQ_OPTIONS.includes(row.freq)) rowErrors.push("Pick a frequency");
+      if (row.freq === "Monthly") {
+        if (!row.monthlyDay) rowErrors.push("Select day of month");
+        if (!row.monthlyInterval) rowErrors.push("Select month interval");
+      }
+      if (row.freq === "Weekly") {
+        if (!row.weeklyDays || row.weeklyDays.length === 0) rowErrors.push("Select at least one weekday");
+      }
+      if (row.freq === "Yearly") {
+        if (!row.yearlyDay) rowErrors.push("Select day");
+        if (!row.yearlyMonth) rowErrors.push("Select month");
+      }
       if (rowErrors.length) errors[row.id] = rowErrors;
     });
     for (let i = 0; i < rows.length; i++) {
@@ -83,7 +162,24 @@ export default function CustomFrequencyWireframe() {
 
   const handleSubmit = () => {
     if (jobFrequency !== "Custom") {
-      alert(`Saved: jobFrequency=${jobFrequency}`);
+      const mainPayload = { jobFrequency };
+      if (jobFrequency === "Monthly") {
+        mainPayload.monthly = {
+          day: mainMonthlyDay,
+          intervalMonths: mainMonthlyInterval,
+        };
+      }
+      if (jobFrequency === "Weekly") {
+        mainPayload.weekly = { days: mainWeeklyDays };
+      }
+      if (jobFrequency === "Yearly") {
+        mainPayload.yearly = {
+          day: mainYearlyDay,
+          month: mainYearlyMonth,
+        };
+      }
+      alert("Saved! Check console for payload.");
+      console.log("Payload", mainPayload);
       return;
     }
     if (hasErrors) {
@@ -96,6 +192,9 @@ export default function CustomFrequencyWireframe() {
         start: r.start,
         end: r.freq === "One time" ? r.start : r.end,
         frequency: r.freq,
+        monthly: r.freq === "Monthly" ? { day: r.monthlyDay, intervalMonths: r.monthlyInterval } : undefined,
+        weekly: r.freq === "Weekly" ? { days: r.weeklyDays } : undefined,
+        yearly: r.freq === "Yearly" ? { day: r.yearlyDay, month: r.yearlyMonth } : undefined,
       })),
     };
     alert("Saved! Check console for payload.");
@@ -119,13 +218,86 @@ export default function CustomFrequencyWireframe() {
                     value={jobFrequency}
                     onChange={(e) => setJobFrequency(e.target.value)}
                   >
-                    {["Daily", "Weekly", "Monthly", "Custom"].map((opt) => (
+                    {["Daily", "Weekly", "Monthly", "Yearly", "Custom"].map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
                 </div>
               </div>
             </div>
+
+            {jobFrequency !== "Custom" && (
+              <div className="mt-4 space-y-3 text-sm">
+                {jobFrequency === "Monthly" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>On day</span>
+                    <select
+                      className="rounded-md border border-gray-300 px-2 py-1"
+                      value={mainMonthlyDay}
+                      onChange={(e) => setMainMonthlyDay(e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      {DAYS_1_31.map((d) => (
+                        <option key={d} value={String(d)}>{d}</option>
+                      ))}
+                    </select>
+                    <span>of every</span>
+                    <select
+                      className="rounded-md border border-gray-300 px-2 py-1"
+                      value={mainMonthlyInterval}
+                      onChange={(e) => setMainMonthlyInterval(e.target.value)}
+                    >
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <span>month(s)</span>
+                  </div>
+                )}
+                {jobFrequency === "Weekly" && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {WEEKDAYS.map((d) => (
+                      <label key={d} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
+                        mainWeeklyDays.includes(d) ? "bg-indigo-50 border-indigo-300" : "border-gray-300"
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={mainWeeklyDays.includes(d)}
+                          onChange={() => toggleMainWeekday(d)}
+                        />
+                        <span>{d}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {jobFrequency === "Yearly" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>On the</span>
+                    <select
+                      className="rounded-md border border-gray-300 px-2 py-1"
+                      value={mainYearlyDay}
+                      onChange={(e) => setMainYearlyDay(e.target.value)}
+                    >
+                      <option value="">Day</option>
+                      {DAYS_1_31.map((d) => (
+                        <option key={d} value={String(d)}>{d}</option>
+                      ))}
+                    </select>
+                    <span>of</span>
+                    <select
+                      className="rounded-md border border-gray-300 px-2 py-1"
+                      value={mainYearlyMonth}
+                      onChange={(e) => setMainYearlyMonth(e.target.value)}
+                    >
+                      <option value="">Month</option>
+                      {MONTHS.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -199,6 +371,78 @@ export default function CustomFrequencyWireframe() {
                       </button>
                     </div>
                   </div>
+
+                  {row.freq === "Monthly" && (
+                    <div className="mt-3 text-sm flex flex-wrap items-center gap-2">
+                      <span>On day</span>
+                      <select
+                        className="rounded-md border border-gray-300 px-2 py-1"
+                        value={row.monthlyDay}
+                        onChange={(e) => updateRow(row.id, "monthlyDay", e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        {DAYS_1_31.map((d) => (
+                          <option key={d} value={String(d)}>{d}</option>
+                        ))}
+                      </select>
+                      <span>of every</span>
+                      <select
+                        className="rounded-md border border-gray-300 px-2 py-1"
+                        value={row.monthlyInterval}
+                        onChange={(e) => updateRow(row.id, "monthlyInterval", e.target.value)}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <span>month(s)</span>
+                    </div>
+                  )}
+
+                  {row.freq === "Weekly" && (
+                    <div className="mt-3 text-sm flex flex-wrap items-center gap-3">
+                      {WEEKDAYS.map((d) => (
+                        <label key={d} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
+                          (row.weeklyDays || []).includes(d) ? "bg-indigo-50 border-indigo-300" : "border-gray-300"
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={(row.weeklyDays || []).includes(d)}
+                            onChange={() => toggleRowWeekday(row.id, d)}
+                          />
+                          <span>{d}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {row.freq === "Yearly" && (
+                    <div className="mt-3 text-sm flex flex-wrap items-center gap-2">
+                      <span>On the</span>
+                      <select
+                        className="rounded-md border border-gray-300 px-2 py-1"
+                        value={row.yearlyDay}
+                        onChange={(e) => updateRow(row.id, "yearlyDay", e.target.value)}
+                      >
+                        <option value="">Day</option>
+                        {DAYS_1_31.map((d) => (
+                          <option key={d} value={String(d)}>{d}</option>
+                        ))}
+                      </select>
+                      <span>of</span>
+                      <select
+                        className="rounded-md border border-gray-300 px-2 py-1"
+                        value={row.yearlyMonth}
+                        onChange={(e) => updateRow(row.id, "yearlyMonth", e.target.value)}
+                      >
+                        <option value="">Month</option>
+                        {MONTHS.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {validation[row.id] && (
                     <ul className="mt-2 text-xs text-red-600 list-disc list-inside">
                       {validation[row.id].map((e, i) => (
@@ -233,7 +477,7 @@ export default function CustomFrequencyWireframe() {
         {jobFrequency !== "Custom" && (
           <section className="mt-6 bg-white border border-gray-200 rounded-xl shadow-sm">
             <div className="px-5 py-4">
-              <p className="text-sm text-gray-700">Selected frequency: <b>{jobFrequency}</b></p>
+              <div className="text-sm text-gray-700">Selected frequency: <b>{jobFrequency}</b></div>
               <div className="mt-3 flex gap-3">
                 <button
                   onClick={handleSubmit}
@@ -242,7 +486,7 @@ export default function CustomFrequencyWireframe() {
                   Save
                 </button>
                 <button
-                  onClick={() => console.log("Preview data", { jobFrequency })}
+                  onClick={() => console.log("Preview data", { jobFrequency, mainMonthlyDay, mainMonthlyInterval, mainWeeklyDays, mainYearlyDay, mainYearlyMonth })}
                   className="rounded-md border border-slate-300 text-slate-800 px-4 py-2 text-sm hover:bg-slate-50"
                 >
                   Preview Data
@@ -252,7 +496,7 @@ export default function CustomFrequencyWireframe() {
           </section>
         )}
 
-        <p className="text-xs text-gray-500 mt-6">This prototype mimics the component/text style in your screenshot: subdued labels, value columns, subtle borders, and action buttons with icons.</p>
+        <p className="text-xs text-gray-500 mt-6">This prototype mimics the component/text style: subdued labels, value columns, subtle borders, and action buttons with icons.</p>
       </div>
     </div>
   );
