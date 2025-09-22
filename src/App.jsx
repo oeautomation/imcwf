@@ -18,6 +18,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/customfreq" element={<CustomFrequencyWireframe />} />
+        <Route path="/measurements" element={<Parameters />} />
       </Routes>
     </HashRouter>
   );
