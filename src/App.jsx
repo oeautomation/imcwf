@@ -14,6 +14,7 @@ function Home() {
   );
 }
 
+
 export default function App() {
   return (
     <HashRouter>
