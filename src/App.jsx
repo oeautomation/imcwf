@@ -15,13 +15,13 @@ function Home() {
 }
 
 
+
 export default function App() {
   return (
     <HashRouter>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/customfreq" element={<CustomFrequencyWireframe />} />
-        <Route path="/measurements" element={<Parameters />} />
         <Route path="/test-method" element={<TestMethodDefinitionPage />} />
       </Routes>
     </HashRouter>
