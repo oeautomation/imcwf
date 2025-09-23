@@ -14,8 +14,6 @@ import React, { useMemo, useState, useEffect } from "react";
  *     that already exist in the Standard Itemised book(s).
  *   - When copying to a CUSTOM book, Standard and Retest-Standard prices are
  *     auto-copied from Standard and are READ-ONLY in the modal.
- *   - In a BULK price book, there is NO dropdown; you can type any Sales Item name
- *     (free-text). Retest prices are not applicable for bulk.
  */
 
 // --- Small helpers ---
@@ -28,9 +26,10 @@ const demoProducts = [
   { id: "P-SPC", name: "SPC - Standard Plate Count", supportsRetest: true },
   { id: "P-YM", name: "YM - Yeast & Mould", supportsRetest: true },
   { id: "P-Misc", name: "Consulting Hour", supportsRetest: false },
+  { id: "P-COST", name: "Project Cost", supportsRetest: false },
 ];
 
-// Seed price books (one standard itemised, many customs supported, one bulk)
+// Seed price books (one standard itemised, one custom itemised, one bulk)
 const seedPriceBooks = [
   {
     id: "PB-STD-ITEM",
@@ -95,7 +94,6 @@ export default function PriceBookPrototype() {
   const isItemised = activeBook.type === "Itemised";
   const isCustomItemised = isItemised && activeBook.isCustom;
   const isStandardItemised = isItemised && !activeBook.isCustom;
-  const isBulk = activeBook.type === "Bulk";
 
   // All standard itemised books (there can be many)
   const standardItemisedBooks = useMemo(
@@ -124,69 +122,56 @@ export default function PriceBookPrototype() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
-    // common
-    status: "Active",
-    effectiveFrom: todayISO(),
-    effectiveTo: "",
-
-    // itemised fields
     productId: "",
+    status: "Active",
     standardPrice: "",
     applicablePrice: "",
     standardRetestPrice: "",
     applicableRetestPrice: "",
+    effectiveFrom: todayISO(),
+    effectiveTo: "",
     copyToCustomBooks: [], // only when adding to Standard Itemised
-
-    // bulk-only fields
-    bulkName: "",
-    bulkCode: "",
   });
 
   // When opening modal, default product depends on context
   function resetFormForContext() {
     if (isStandardItemised) {
       setForm({
-        status: "Active",
-        effectiveFrom: todayISO(),
-        effectiveTo: "",
         productId: demoProducts[0].id,
+        status: "Active",
         standardPrice: "",
         applicablePrice: "",
         standardRetestPrice: "",
         applicableRetestPrice: "",
+        effectiveFrom: todayISO(),
+        effectiveTo: "",
         copyToCustomBooks: [],
-        bulkName: "",
-        bulkCode: "",
       });
     } else if (isCustomItemised) {
       const defaultStd = standardCatalog[0];
       setForm({
-        status: "Active",
-        effectiveFrom: todayISO(),
-        effectiveTo: "",
         productId: defaultStd?.productId || "",
+        status: "Active",
         standardPrice: defaultStd?.standardPrice ?? "",
         applicablePrice: defaultStd?.standardPrice ?? "",
         standardRetestPrice: defaultStd?.standardRetestPrice ?? "",
         applicableRetestPrice: defaultStd?.standardRetestPrice ?? "",
-        copyToCustomBooks: [],
-        bulkName: "",
-        bulkCode: "",
-      });
-    } else {
-      // BULK: free-text item name & optional code; no retest fields
-      setForm({
-        status: "Active",
         effectiveFrom: todayISO(),
         effectiveTo: "",
-        productId: "", // not used for bulk
+        copyToCustomBooks: [],
+      });
+    } else {
+      // Bulk: treat similar to standard add, but without retest fields being relevant
+      setForm({
+        productId: demoProducts[0].id,
+        status: "Active",
         standardPrice: "",
         applicablePrice: "",
         standardRetestPrice: "",
         applicableRetestPrice: "",
+        effectiveFrom: todayISO(),
+        effectiveTo: "",
         copyToCustomBooks: [],
-        bulkName: "",
-        bulkCode: "",
       });
     }
   }
@@ -201,10 +186,9 @@ export default function PriceBookPrototype() {
       // find from standard catalog (already in standard)
       return standardCatalog.find((p) => p.productId === form.productId) || null;
     }
-    if (isBulk) return null;
     // else choose from demo products
     return demoProducts.find((p) => p.id === form.productId) || null;
-  }, [form.productId, isCustomItemised, isBulk, standardCatalog]);
+  }, [form.productId, isCustomItemised, standardCatalog]);
 
   const customItemisedBooks = useMemo(
     () => priceBooks.filter((b) => b.type === "Itemised" && b.isCustom),
@@ -234,52 +218,34 @@ export default function PriceBookPrototype() {
   }
 
   function handleSave() {
-    // Build base item depending on context
-    let productId = "";
-    let productName = "";
-    let standardPrice = null;
-    let standardRetestPrice = null;
-    let applicablePrice = null;
-    let applicableRetestPrice = null;
+    if (!form.productId) return;
 
-    if (isBulk) {
-      if (!form.bulkName?.trim()) return; // require a name for bulk
-      productName = form.bulkName.trim();
-      productId = form.bulkCode?.trim() || `BULK-${uid()}`;
-      standardPrice = form.standardPrice === "" ? null : Number(form.standardPrice);
-      applicablePrice = form.applicablePrice === "" ? null : Number(form.applicablePrice);
-      standardRetestPrice = null;
-      applicableRetestPrice = null;
-    } else if (isCustomItemised) {
-      if (!form.productId) return;
-      const std = standardCatalog.find((p) => p.productId === form.productId);
-      productId = form.productId;
-      productName = std?.productName || "";
-      standardPrice = Number(std?.standardPrice ?? 0); // enforce copy from standard
-      applicablePrice = form.applicablePrice === "" ? null : Number(form.applicablePrice);
-      standardRetestPrice = Number(std?.standardRetestPrice ?? 0);
-      applicableRetestPrice = form.applicableRetestPrice === "" ? null : Number(form.applicableRetestPrice);
-    } else {
-      // Standard Itemised
-      if (!form.productId) return;
-      const demo = demoProducts.find((x) => x.id === form.productId);
-      productId = form.productId;
-      productName = demo?.name || "";
-      standardPrice = form.standardPrice === "" ? null : Number(form.standardPrice);
-      applicablePrice = form.applicablePrice === "" ? null : Number(form.applicablePrice);
-      standardRetestPrice = form.standardRetestPrice === "" ? null : Number(form.standardRetestPrice);
-      applicableRetestPrice = form.applicableRetestPrice === "" ? null : Number(form.applicableRetestPrice);
-    }
-
+    // Build base item
     const baseItem = {
       id: uid(),
-      productId,
-      productName,
+      productId: form.productId,
+      productName: isCustomItemised
+        ? standardCatalog.find((x) => x.productId === form.productId)?.productName || ""
+        : demoProducts.find((x) => x.id === form.productId)?.name || "",
       status: form.status,
-      standardPrice,
-      applicablePrice,
-      standardRetestPrice: isItemised ? standardRetestPrice : null,
-      applicableRetestPrice: isItemised ? applicableRetestPrice : null,
+      standardPrice:
+        isCustomItemised
+          ? // enforce copy from standard for custom
+            Number(standardCatalog.find((p) => p.productId === form.productId)?.standardPrice ?? 0)
+          : form.standardPrice === "" ? null : Number(form.standardPrice),
+      applicablePrice: form.applicablePrice === "" ? null : Number(form.applicablePrice),
+      standardRetestPrice:
+        isItemised
+          ? (isCustomItemised
+              ? Number(
+                  standardCatalog.find((p) => p.productId === form.productId)?.standardRetestPrice ?? 0
+                )
+              : form.standardRetestPrice === "" ? null : Number(form.standardRetestPrice))
+          : null,
+      applicableRetestPrice:
+        isItemised
+          ? form.applicableRetestPrice === "" ? null : Number(form.applicableRetestPrice)
+          : null,
       effectiveFrom: form.effectiveFrom || todayISO(),
       effectiveTo: form.effectiveTo || "",
     };
@@ -419,63 +385,36 @@ export default function PriceBookPrototype() {
 
           <div className="relative z-10 w-full max-w-2xl rounded-2xl border bg-white p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">
-                {isCustomItemised ? "Copy Sales Item from Standard" : isBulk ? "Add Bulk Sales Item" : "Add Sales Item"}
-              </h3>
+              <h3 className="text-lg font-semibold">{isCustomItemised ? "Copy Sales Item from Standard" : "Add Sales Item"}</h3>
               <button className="rounded-xl border px-3 py-1 text-xs hover:bg-gray-50" onClick={() => setShowModal(false)}>Close</button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Product selector (Itemised) OR Free-text (Bulk) */}
-              {isBulk ? (
-                <>
-                  <label className="text-sm md:col-span-2">
-                    <span className="mb-1 block text-gray-700">Sales Item Name</span>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border px-3 py-2"
-                      placeholder="e.g., Project Management Day Rate"
-                      value={form.bulkName}
-                      onChange={(e) => setForm({ ...form, bulkName: e.target.value })}
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-gray-700">Item Code (optional)</span>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border px-3 py-2"
-                      placeholder="auto if blank"
-                      value={form.bulkCode}
-                      onChange={(e) => setForm({ ...form, bulkCode: e.target.value })}
-                    />
-                  </label>
-                </>
-              ) : (
-                <label className="text-sm">
-                  <span className="mb-1 block text-gray-700">{isCustomItemised ? "Sales Item (from Standard)" : "Product"}</span>
-                  <select
-                    className="w-full rounded-xl border px-3 py-2"
-                    value={form.productId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (isCustomItemised) handleProductChangeCustom(val);
-                      else setForm({ ...form, productId: val });
-                    }}
-                  >
-                    {isCustomItemised
-                      ? standardCatalog.map((p) => (
-                          <option key={p.productId} value={p.productId}>
-                            {p.productName}
-                          </option>
-                        ))
-                      : demoProducts.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                  </select>
-                </label>
-              )}
+              {/* Product */}
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">{isCustomItemised ? "Sales Item (from Standard)" : "Product"}</span>
+                <select
+                  className="w-full rounded-xl border px-3 py-2"
+                  value={form.productId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (isCustomItemised) handleProductChangeCustom(val);
+                    else setForm({ ...form, productId: val });
+                  }}
+                >
+                  {isCustomItemised
+                    ? standardCatalog.map((p) => (
+                        <option key={p.productId} value={p.productId}>
+                          {p.productName}
+                        </option>
+                      ))
+                    : demoProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                </select>
+              </label>
 
               {/* Status */}
               <label className="text-sm">
@@ -514,7 +453,6 @@ export default function PriceBookPrototype() {
                 />
               </label>
 
-              {/* Retest fields only for Itemised */}
               {isItemised && (
                 <>
                   <label className="text-sm">
