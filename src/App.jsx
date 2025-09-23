@@ -19,6 +19,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/customfreq" element={<CustomFrequencyWireframe />} />
         <Route path="/measurements" element={<Parameters />} />
+        <Route path="/methods" element={<test_methods />} />
       </Routes>
     </HashRouter>
   );
