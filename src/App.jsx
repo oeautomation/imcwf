@@ -1,6 +1,8 @@
 import React from "react";
 import { HashRouter, Routes, Route, Link } from "react-router-dom";
 import CustomFrequencyWireframe from "./CustomFrequencyWireframe.jsx";
+import TestMethodDefinitionPage from "./test_methods.jsx";
+
 
 function Home() {
   return (
@@ -19,7 +21,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/customfreq" element={<CustomFrequencyWireframe />} />
         <Route path="/measurements" element={<Parameters />} />
-        <Route path="/methods" element={<test_methods />} />
+        <Route path="/test-method" element={<TestMethodDefinitionPage />} />
       </Routes>
     </HashRouter>
   );
