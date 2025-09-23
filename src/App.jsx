@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Link } from "react-router-dom";
 import CustomFrequencyWireframe from "./CustomFrequencyWireframe.jsx";
 import TestMethodDefinitionPage from "./test_methods.jsx";
 import TestMethodDefinitionPage2 from "./test_methods2.jsx";
+import PriceBook from "./pricebook.jsx";
 
 function Home() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/customfreq" element={<CustomFrequencyWireframe />} />
         <Route path="/test-method" element={<TestMethodDefinitionPage />} />
         <Route path="/test-method2" element={<TestMethodDefinitionPage2 />} />
+        <Route path="/pricebook" element={<PriceBook />} />
       </Routes>
     </HashRouter>
   );
