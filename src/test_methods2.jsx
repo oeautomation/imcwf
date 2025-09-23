@@ -42,11 +42,11 @@ const STYLES = {
   tabActive:
     "px-3 py-2 -mb-px rounded-t-md border border-slate-200 border-b-white bg-white text-sm text-slate-900",
   modalBackdrop:
-    "fixed inset-0 bg-black/30",
+    "fixed inset-0 bg-black/30 z-40",
   modal:
-    "fixed inset-0 flex items-center justify-center p-4",
+    "fixed inset-0 z-50 flex items-center justify-center p-4",
   modalPanel:
-    "w-full max-w-3xl rounded-lg border border-slate-200 bg-white shadow-xl",
+    "relative z-50 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg border border-slate-200 bg-white shadow-xl overflow-hidden",
   chip:
     "inline-flex items-center px-2 py-0.5 rounded-md text-xs border border-slate-300",
 };
@@ -89,6 +89,31 @@ const safeId = () =>
     ? window.crypto.randomUUID()
     : `id_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
+const computeMethodCode = (prefix, version) => {
+  if (!prefix && !version) return "—";
+  return `${prefix || "0"}.${version || "0"}`;
+};
+
+const validateMethodAndAnalytes = (method, analytes) => {
+  const errors = [];
+  if (!method.codePrefix) errors.push("Method Code (Prefix) is required");
+  if (!method.codeVersion) errors.push("Method Code (Version) is required");
+  if (!method.name) errors.push("Name is required");
+  if (!method.shortCode || (method.shortCode.length !== 3 && method.shortCode.length !== 4)) {
+    errors.push("Short code is required (3–4 characters)");
+  }
+  if (!method.methodUnits) errors.push("Method Units is required");
+  if (method.defaultDilutions < 1) errors.push("Default number of dilutions must be ≥ 1");
+  if (method.multipleMedia && method.mediaSelected.length === 0) {
+    errors.push("Select at least one medium when Multiple Media is enabled");
+  }
+  analytes.forEach((a, idx) => {
+    if (!a.analyteCodeSuffix) errors.push(`Analyte #${idx + 1}: Analyte Code (numeric suffix) is required`);
+    if (!a.units) errors.push(`Analyte #${idx + 1}: Method Units is required`);
+  });
+  return errors;
+};
+
 export default function TestMethodDefinitionPage() {
   const [method, setMethod] = useState({
     codePrefix: "",
@@ -111,10 +136,7 @@ export default function TestMethodDefinitionPage() {
   const [showAnalyteModal, setShowAnalyteModal] = useState(false);
   const [draftAnalyte, setDraftAnalyte] = useState(null);
 
-  const methodCode = useMemo(() => {
-    if (!method.codePrefix && !method.codeVersion) return "—";
-    return [method.codePrefix || "0", method.codeVersion || "0"].join(".");
-  }, [method.codePrefix, method.codeVersion]);
+  const methodCode = useMemo(() => computeMethodCode(method.codePrefix, method.codeVersion), [method.codePrefix, method.codeVersion]);
 
   const startAddAnalyte = () => {
     setDraftAnalyte({
@@ -137,13 +159,11 @@ export default function TestMethodDefinitionPage() {
   };
 
   const saveAnalyte = () => {
-    if (!draftAnalyte.analyteCodeSuffix) return alert("Analyte Code is required");
-    setAnalytes((prev) => [...prev, draftAnalyte]);
+    if (!draftAnalyte || !draftAnalyte.analyteCodeSuffix) return alert("Analyte Code is required");
+    const toAdd = { ...draftAnalyte };
+    setAnalytes((prev) => [...prev, toAdd]);
     setShowAnalyteModal(false);
-  };
-
-  const updateAnalyte = (id, patch) => {
-    setAnalytes((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+    setDraftAnalyte(null);
   };
 
   const removeAnalyte = (id) => {
@@ -158,28 +178,8 @@ export default function TestMethodDefinitionPage() {
     });
   };
 
-  const validate = () => {
-    const errors = [];
-    if (!method.codePrefix) errors.push("Method Code (Prefix) is required");
-    if (!method.codeVersion) errors.push("Method Code (Version) is required");
-    if (!method.name) errors.push("Name is required");
-    if (!method.shortCode || (method.shortCode.length !== 3 && method.shortCode.length !== 4)) {
-      errors.push("Short code is required (3–4 characters)");
-    }
-    if (!method.methodUnits) errors.push("Method Units is required");
-    if (method.defaultDilutions < 1) errors.push("Default number of dilutions must be ≥ 1");
-    if (method.multipleMedia && method.mediaSelected.length === 0) {
-      errors.push("Select at least one medium when Multiple Media is enabled");
-    }
-    analytes.forEach((a, idx) => {
-      if (!a.analyteCodeSuffix) errors.push(`Analyte #${idx + 1}: Analyte Code (numeric suffix) is required`);
-      if (!a.units) errors.push(`Analyte #${idx + 1}: Method Units is required`);
-    });
-    return errors;
-  };
-
   const handleSave = () => {
-    const errors = validate();
+    const errors = validateMethodAndAnalytes(method, analytes);
     if (errors.length) {
       alert("Please fix the following before saving:\n\n" + errors.map((e) => `• ${e}`).join("\n"));
       return;
@@ -286,7 +286,7 @@ export default function TestMethodDefinitionPage() {
             <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-slate-700">Analyte List</h3>
-                <button onClick={startAddAnalyte} className={STYLES.btnPrimary}>Add Analyte</button>
+                <button type="button" onClick={startAddAnalyte} className={STYLES.btnPrimary}>Add Analyte</button>
               </div>
               {analytes.length === 0 ? (
                 <p className="text-sm text-slate-500 mt-3">No analytes added yet.</p>
@@ -323,7 +323,7 @@ export default function TestMethodDefinitionPage() {
               <h3 className="text-base font-semibold text-slate-800">Add Analyte</h3>
               <button onClick={() => setShowAnalyteModal(false)} className={STYLES.btnSecondary}>Close</button>
             </div>
-            <div className="p-4">
+            <div className="p-4 overflow-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <TextInput label="Analyte Code (numeric suffix)" required value={draftAnalyte.analyteCodeSuffix} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, analyteCodeSuffix: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 2" />
                 <StaticField label="Computed Analyte Code" value={`${methodCode}.${draftAnalyte.analyteCodeSuffix || "—"}`} />
@@ -349,7 +349,7 @@ export default function TestMethodDefinitionPage() {
             </div>
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
               <button onClick={() => setShowAnalyteModal(false)} className={STYLES.btnSecondary}>Cancel</button>
-              <button onClick={saveAnalyte} className={STYLES.btnPrimary}>Save Analyte</button>
+              <button type="button" onClick={saveAnalyte} className={STYLES.btnPrimary}>Save Analyte</button>
             </div>
           </div>
         </div>
@@ -498,3 +498,18 @@ function MultiSelect({ label, options, value, onChange }) {
     </div>
   );
 }
+
+// lightweight browser-side tests
+(function runInlineTests(){
+  try {
+    console.assert(computeMethodCode("7","1") === "7.1", "computeMethodCode failed");
+    console.assert(computeMethodCode("","") === "—", "computeMethodCode empty failed");
+    const errs1 = validateMethodAndAnalytes({codePrefix:"", codeVersion:"", name:"", shortCode:"", methodUnits:""}, []);
+    console.assert(errs1.length >= 4, "validate should flag required fields");
+    const errs2 = validateMethodAndAnalytes({codePrefix:"7", codeVersion:"1", name:"X", shortCode:"SPC", methodUnits:"CFU/mL", defaultDilutions:1, multipleMedia:false, mediaSelected:[]}, [{analyteCodeSuffix:"2", units:"CFU/mL"}]);
+    console.assert(errs2.length === 0, "validate should pass valid inputs");
+    console.log("Inline tests passed");
+  } catch (e) {
+    console.error("Inline tests failed", e);
+  }
+})();
