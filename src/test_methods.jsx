@@ -35,6 +35,20 @@ const STYLES = {
     "text-base font-semibold text-slate-800",
   subtitle:
     "text-sm text-slate-500 mt-1",
+  tabsBar:
+    "flex items-center gap-2 border-b border-slate-200",
+  tab:
+    "px-3 py-2 -mb-px rounded-t-md border border-transparent text-sm text-slate-600 hover:text-slate-900",
+  tabActive:
+    "px-3 py-2 -mb-px rounded-t-md border border-slate-200 border-b-white bg-white text-sm text-slate-900",
+  modalBackdrop:
+    "fixed inset-0 bg-black/30 z-40",
+  modal:
+    "fixed inset-0 z-50 flex items-center justify-center p-4",
+  modalPanel:
+    "relative z-50 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg border border-slate-200 bg-white shadow-xl overflow-hidden",
+  chip:
+    "inline-flex items-center px-2 py-0.5 rounded-md text-xs border border-slate-300",
 };
 
 const MEDIA_OPTIONS = [
@@ -70,6 +84,46 @@ const RESULT_OPERATORS = [
   "Absent",
 ];
 
+const DATA_TYPES = [
+  "Boolean",
+  "Integer",
+  "Text",
+  "Decimal",
+  "Enum",
+  "Date time",
+  "Attachment",
+];
+
+const safeId = () =>
+  (typeof window !== "undefined" && window.crypto && typeof window.crypto.randomUUID === "function")
+    ? window.crypto.randomUUID()
+    : `id_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+
+const computeMethodCode = (prefix, version) => {
+  if (!prefix && !version) return "—";
+  return `${prefix || "0"}.${version || "0"}`;
+};
+
+const validateMethodAndAnalytes = (method, analytes) => {
+  const errors = [];
+  if (!method.codePrefix) errors.push("Method Code (Prefix) is required");
+  if (!method.codeVersion) errors.push("Method Code (Version) is required");
+  if (!method.name) errors.push("Name is required");
+  if (!method.shortCode || (method.shortCode.length !== 3 && method.shortCode.length !== 4)) {
+    errors.push("Short code is required (3–4 characters)");
+  }
+  if (!method.methodUnits) errors.push("Method Units is required");
+  if (method.defaultDilutions < 1) errors.push("Default number of dilutions must be ≥ 1");
+  if (method.multipleMedia && method.mediaSelected.length === 0) {
+    errors.push("Select at least one medium when Multiple Media is enabled");
+  }
+  analytes.forEach((a, idx) => {
+    if (!a.analyteCodeSuffix) errors.push(`Analyte #${idx + 1}: Analyte Code (numeric suffix) is required`);
+    if (!a.units) errors.push(`Analyte #${idx + 1}: Method Units is required`);
+  });
+  return errors;
+};
+
 export default function TestMethodDefinitionPage() {
   const [method, setMethod] = useState({
     codePrefix: "",
@@ -87,42 +141,98 @@ export default function TestMethodDefinitionPage() {
     mediaSelected: [],
   });
 
-  const [analytes, setAnalytes] = useState([]);
+  const [analytes, setAnalytes] = useState([
+    { id: safeId(), analyteCodeSuffix: "PC", description: "Project Cost", sampleTypes: [], units: "mg/L" },
+  ]);
 
-  const methodCode = useMemo(() => {
-    if (!method.codePrefix && !method.codeVersion) return "—";
-    return [method.codePrefix || "0", method.codeVersion || "0"].join(".");
-  }, [method.codePrefix, method.codeVersion]);
+  const [adornments, setAdornments] = useState([]);
+  const [supportingValues, setSupportingValues] = useState([]);
 
-  const addAnalyte = () => {
-    setAnalytes((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        analyteCodeSuffix: "",
-        sampleTypes: [],
-        defaultResultOp: RESULT_OPERATORS[0],
-        defaultResultValue: "",
-        secondaryValuesCsv: "",
-        alertValue: "",
-        description: "",
-        italics: false,
-        detectionLimit: "",
-        reportShortName: "",
-        note: "",
-        units: method.methodUnits || "CFU/mL",
-        accredited: false,
-      },
-    ]);
+  const [activeTab, setActiveTab] = useState("Analytes");
+  const [showAnalyteModal, setShowAnalyteModal] = useState(false);
+  const [showAdornmentModal, setShowAdornmentModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [draftAnalyte, setDraftAnalyte] = useState(null);
+  const [draftAdornment, setDraftAdornment] = useState(null);
+  const [draftSupport, setDraftSupport] = useState(null);
+
+  const methodCode = useMemo(() => computeMethodCode(method.codePrefix, method.codeVersion), [method.codePrefix, method.codeVersion]);
+
+  const startAddAnalyte = () => {
+    setDraftAnalyte({
+      id: safeId(),
+      analyteCodeSuffix: "",
+      sampleTypes: [],
+      defaultResultOp: RESULT_OPERATORS[0],
+      defaultResultValue: "",
+      secondaryValuesCsv: "",
+      alertValue: "",
+      description: "",
+      italics: false,
+      detectionLimit: "",
+      reportShortName: "",
+      note: "",
+      units: method.methodUnits || "CFU/mL",
+      accredited: false,
+    });
+    setShowAnalyteModal(true);
   };
 
-  const updateAnalyte = (id, patch) => {
-    setAnalytes((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  const startAddAdornment = () => {
+    setDraftAdornment({
+      id: safeId(),
+      key: "",
+      label: "",
+      analyteId: analytes[0]?.id || "",
+      dataType: DATA_TYPES[0],
+      required: true,
+      showInReport: false,
+      reportShortName: "",
+      format: "",
+    });
+    setShowAdornmentModal(true);
   };
 
-  const removeAnalyte = (id) => {
-    setAnalytes((prev) => prev.filter((a) => a.id !== id));
+  const startAddSupport = () => {
+    setDraftSupport({
+      id: safeId(),
+      key: "",
+      label: "",
+      dataType: DATA_TYPES[0],
+      required: true,
+      keyForCalculation: "",
+      format: "",
+    });
+    setShowSupportModal(true);
   };
+
+  const saveAnalyte = () => {
+    if (!draftAnalyte || !draftAnalyte.analyteCodeSuffix) return alert("Analyte Code is required");
+    const toAdd = { ...draftAnalyte };
+    setAnalytes((prev) => [...prev, toAdd]);
+    setShowAnalyteModal(false);
+    setDraftAnalyte(null);
+  };
+
+  const saveAdornment = () => {
+    if (!draftAdornment || !draftAdornment.key || !draftAdornment.label || !draftAdornment.analyteId) return alert("Key, Label and Analyte are required");
+    const toAdd = { ...draftAdornment };
+    setAdornments((prev) => [...prev, toAdd]);
+    setShowAdornmentModal(false);
+    setDraftAdornment(null);
+  };
+
+  const saveSupport = () => {
+    if (!draftSupport || !draftSupport.key || !draftSupport.label || !draftSupport.keyForCalculation) return alert("Key, Label and Key for calculation are required");
+    const toAdd = { ...draftSupport };
+    setSupportingValues((prev) => [...prev, toAdd]);
+    setShowSupportModal(false);
+    setDraftSupport(null);
+  };
+
+  const removeAnalyte = (id) => setAnalytes((prev) => prev.filter((a) => a.id !== id));
+  const removeAdornment = (id) => setAdornments((prev) => prev.filter((a) => a.id !== id));
+  const removeSupport = (id) => setSupportingValues((prev) => prev.filter((a) => a.id !== id));
 
   const toggleMediaSelection = (id) => {
     setMethod((m) => {
@@ -132,41 +242,20 @@ export default function TestMethodDefinitionPage() {
     });
   };
 
-  const validate = () => {
-    const errors = [];
-    if (!method.codePrefix) errors.push("Method Code (Prefix) is required");
-    if (!method.codeVersion) errors.push("Method Code (Version) is required");
-    if (!method.name) errors.push("Name is required");
-    if (!method.shortCode || (method.shortCode.length !== 3 && method.shortCode.length !== 4)) {
-      errors.push("Short code is required (3–4 characters)");
-    }
-    if (!method.methodUnits) errors.push("Method Units is required");
-    if (method.defaultDilutions < 1) errors.push("Default number of dilutions must be ≥ 1");
-    if (method.multipleMedia && method.mediaSelected.length === 0) {
-      errors.push("Select at least one medium when Multiple Media is enabled");
-    }
-    analytes.forEach((a, idx) => {
-      if (!a.analyteCodeSuffix) errors.push(`Analyte #${idx + 1}: Analyte Code (numeric suffix) is required`);
-      if (!a.units) errors.push(`Analyte #${idx + 1}: Method Units is required`);
-    });
-    return errors;
-  };
-
   const handleSave = () => {
-    const errors = validate();
+    const errors = validateMethodAndAnalytes(method, analytes);
     if (errors.length) {
       alert("Please fix the following before saving:\n\n" + errors.map((e) => `• ${e}`).join("\n"));
       return;
     }
     const payload = {
-      method: {
-        ...method,
-        codeComputed: methodCode,
-      },
-      analytes: analytes.map((a) => ({
-        ...a,
-        analyteCodeComputed: `${methodCode}.${a.analyteCodeSuffix || "0"}`,
+      method: { ...method, codeComputed: methodCode },
+      analytes: analytes.map((a) => ({ ...a, analyteCodeComputed: `${methodCode}.${a.analyteCodeSuffix || "0"}` })),
+      adornments: adornments.map((ad) => ({
+        ...ad,
+        analyteCode: analytes.find((x) => x.id === ad.analyteId)?.analyteCodeSuffix || "",
       })),
+      supportingValues,
     };
     console.log("SAVE", payload);
     alert("Saved! (Check console for payload)");
@@ -189,7 +278,9 @@ export default function TestMethodDefinitionPage() {
       multipleMedia: false,
       mediaSelected: [],
     });
-    setAnalytes([]);
+    setAnalytes([{ id: safeId(), analyteCodeSuffix: "PC", description: "Project Cost", sampleTypes: [], units: "mg/L" }]);
+    setAdornments([]);
+    setSupportingValues([]);
   };
 
   return (
@@ -204,8 +295,8 @@ export default function TestMethodDefinitionPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 space-y-6">
+      <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
+        <section>
           <Card title="Method Details" subtitle="Primary method identifier, metadata, and scope.">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <TextInput label="Method Code (Prefix)" required value={method.codePrefix} onChange={(v) => setMethod({ ...method, codePrefix: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 7" />
@@ -236,12 +327,7 @@ export default function TestMethodDefinitionPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-1">
                     {MEDIA_OPTIONS.map((m) => (
                       <label key={m.id} className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={method.mediaSelected.includes(m.id)}
-                          onChange={() => toggleMediaSelection(m.id)}
-                        />
+                        <input type="checkbox" className="h-4 w-4" checked={method.mediaSelected.includes(m.id)} onChange={() => toggleMediaSelection(m.id)} />
                         <span className="text-sm">{m.name}</span>
                       </label>
                     ))}
@@ -250,67 +336,213 @@ export default function TestMethodDefinitionPage() {
               )}
             </div>
           </Card>
-
-          <Card title="Analytes" subtitle="Each test method may contain one or more analytes. Codes append to the method code (e.g., 7.1.2).">
-            <div className="flex justify-end">
-              <button onClick={addAnalyte} className={STYLES.btnPrimary}>Add Analyte</button>
-            </div>
-            {analytes.length === 0 && (
-              <p className="text-sm text-slate-500 mt-3">No analytes added yet.</p>
-            )}
-            <div className="space-y-6 mt-4">
-              {analytes.map((a, idx) => (
-                <div key={a.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="font-medium">Analyte #{idx + 1}</div>
-                    <button onClick={() => removeAnalyte(a.id)} className="text-sm text-red-600 hover:underline">Remove</button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <TextInput label="Analyte Code (numeric suffix)" required value={a.analyteCodeSuffix} onChange={(v) => updateAnalyte(a.id, { analyteCodeSuffix: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 2" />
-                    <StaticField label="Computed Analyte Code" value={`${methodCode}.${a.analyteCodeSuffix || "—"}`} />
-                    <SelectInput label="Method Units" required options={UNITS} value={a.units} onChange={(v) => updateAnalyte(a.id, { units: v })} />
-
-                    <MultiSelect label="Sample Types" options={SAMPLE_TYPES} value={a.sampleTypes} onChange={(arr) => updateAnalyte(a.id, { sampleTypes: arr })} />
-
-                    <SelectInput label="Default Result (Operator)" options={RESULT_OPERATORS} value={a.defaultResultOp} onChange={(v) => updateAnalyte(a.id, { defaultResultOp: v })} />
-                    <TextInput label="Default Result (Value)" value={a.defaultResultValue} onChange={(v) => updateAnalyte(a.id, { defaultResultValue: v })} placeholder="e.g., 10" />
-
-                    <TextInput className="md:col-span-2" label="Supported secondary values (CSV)" value={a.secondaryValuesCsv} onChange={(v) => updateAnalyte(a.id, { secondaryValuesCsv: v })} placeholder="Negligible or excellent, Mild to very good, Good, Moderate to fair, Poor, Very Poor" />
-                    <TextInput label="Alert Value (threshold)" value={a.alertValue} onChange={(v) => updateAnalyte(a.id, { alertValue: v })} placeholder="e.g., 500" />
-
-                    <TextInput className="md:col-span-2" label="Description (e.g., Escherichia coli)" value={a.description} onChange={(v) => updateAnalyte(a.id, { description: v })} />
-                    <CheckboxInput label="Italicize Description (reports)" checked={a.italics} onChange={(v) => updateAnalyte(a.id, { italics: v })} />
-
-                    <TextInput label="Detection Limit" value={a.detectionLimit} onChange={(v) => updateAnalyte(a.id, { detectionLimit: v })} placeholder="e.g., 1 CFU/100mL" />
-                    <TextInput label="Report Short Name" value={a.reportShortName} onChange={(v) => updateAnalyte(a.id, { reportShortName: v })} placeholder="E. coli" />
-                    <CheckboxInput label="Accredited (NATA/SAMM)" checked={a.accredited} onChange={(v) => updateAnalyte(a.id, { accredited: v })} />
-
-                    <TextArea className="md:col-span-3" label="Note" value={a.note} onChange={(v) => updateAnalyte(a.id, { note: v })} placeholder="Specific constraints or remarks" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
         </section>
 
-        <section className="lg:col-span-1">
-          <Card title="Live JSON Preview" subtitle="Serialised payload on Save.">
-            <pre className="text-xs bg-slate-900 text-slate-50 p-3 rounded-xl overflow-auto max-h-[70vh]">
-              {JSON.stringify(
-                {
-                  method: { ...method, codeComputed: methodCode },
-                  analytes: analytes.map((a) => ({
-                    ...a,
-                    analyteCodeComputed: `${methodCode}.${a.analyteCodeSuffix || "0"}`,
-                  })),
-                },
-                null,
-                2
+        <section>
+          <div className={STYLES.tabsBar}>
+            <button className={activeTab === "Analytes" ? STYLES.tabActive : STYLES.tab} onClick={() => setActiveTab("Analytes")}>Analytes</button>
+            <button className={activeTab === "Adornments" ? STYLES.tabActive : STYLES.tab} onClick={() => setActiveTab("Adornments")}>Adornments</button>
+            <button className={activeTab === "Supporting Values" ? STYLES.tabActive : STYLES.tab} onClick={() => setActiveTab("Supporting Values")}>Supporting Values</button>
+          </div>
+
+          {activeTab === "Analytes" && (
+            <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700">Analyte List</h3>
+                <button type="button" onClick={startAddAnalyte} className={STYLES.btnPrimary}>Add Analyte</button>
+              </div>
+              {analytes.length === 0 ? (
+                <p className="text-sm text-slate-500 mt-3">No analytes added yet.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {analytes.map((a) => (
+                    <li key={a.id} className="flex items-start justify-between gap-4 rounded-md border border-slate-200 p-3">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-slate-800">{`${methodCode}.${a.analyteCodeSuffix || "—"}`}</div>
+                        <div className="text-sm text-slate-600">{a.description || "—"}</div>
+                        <div className="flex flex-wrap gap-1">
+                          {(a.sampleTypes || []).map((s) => (
+                            <span key={s} className={STYLES.chip}>{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => removeAnalyte(a.id)} className={STYLES.btnDanger}>Remove</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </pre>
-          </Card>
+            </div>
+          )}
+
+          {activeTab === "Adornments" && (
+            <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700">Adornment List</h3>
+                <button type="button" onClick={startAddAdornment} className={STYLES.btnPrimary}>Add Adornment</button>
+              </div>
+              {adornments.length === 0 ? (
+                <p className="text-sm text-slate-500 mt-3">No adornments added yet.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {adornments.map((ad) => {
+                    const linked = analytes.find((x) => x.id === ad.analyteId);
+                    return (
+                      <li key={ad.id} className="flex items-start justify-between gap-4 rounded-md border border-slate-200 p-3">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-slate-800">{ad.label} <span className="text-slate-500">({ad.key})</span></div>
+                          <div className="text-xs text-slate-600">Type: {ad.dataType} · Required: {ad.required ? "Yes" : "No"} · Report: {ad.showInReport ? "Yes" : "No"}</div>
+                          <div className="text-xs text-slate-600">Linked analyte: {linked ? `${methodCode}.${linked.analyteCodeSuffix}` : "—"}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => removeAdornment(ad.id)} className={STYLES.btnDanger}>Remove</button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Supporting Values" && (
+            <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700">Supporting Values</h3>
+                <button type="button" onClick={startAddSupport} className={STYLES.btnPrimary}>Add Supporting Value</button>
+              </div>
+              {supportingValues.length === 0 ? (
+                <p className="text-sm text-slate-500 mt-3">No supporting values added yet.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {supportingValues.map((sv) => (
+                    <li key={sv.id} className="flex items-start justify-between gap-4 rounded-md border border-slate-200 p-3">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-slate-800">{sv.label} <span className="text-slate-500">({sv.key})</span></div>
+                        <div className="text-xs text-slate-600">Type: {sv.dataType} · Required: {sv.required ? "Yes" : "No"}</div>
+                        <div className="text-xs text-slate-600">Key for calculation: {sv.keyForCalculation || "—"}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => removeSupport(sv.id)} className={STYLES.btnDanger}>Remove</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
       </main>
+
+      {showAnalyteModal && (
+        <div className={STYLES.modal}>
+          <div className={STYLES.modalBackdrop} onClick={() => setShowAnalyteModal(false)} />
+          <div className={STYLES.modalPanel}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">Add Analyte</h3>
+              <button onClick={() => setShowAnalyteModal(false)} className={STYLES.btnSecondary}>Close</button>
+            </div>
+            <div className="p-4 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TextInput label="Analyte Code (numeric suffix)" required value={draftAnalyte.analyteCodeSuffix} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, analyteCodeSuffix: v.replace(/[^0-9A-Za-z]/g, "") })} placeholder="e.g., 2" />
+                <StaticField label="Computed Analyte Code" value={`${methodCode}.${draftAnalyte.analyteCodeSuffix || "—"}`} />
+                <SelectInput label="Method Units" required options={UNITS} value={draftAnalyte.units} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, units: v })} />
+
+                <MultiSelect label="Sample Types" options={SAMPLE_TYPES} value={draftAnalyte.sampleTypes} onChange={(arr) => setDraftAnalyte({ ...draftAnalyte, sampleTypes: arr })} />
+
+                <SelectInput label="Default Result (Operator)" options={RESULT_OPERATORS} value={draftAnalyte.defaultResultOp} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, defaultResultOp: v })} />
+                <TextInput label="Default Result (Value)" value={draftAnalyte.defaultResultValue} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, defaultResultValue: v })} placeholder="e.g., 10" />
+
+                <TextInput className="md:col-span-2" label="Supported secondary values (CSV)" value={draftAnalyte.secondaryValuesCsv} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, secondaryValuesCsv: v })} placeholder="Negligible or excellent, Mild to very good, Good, Moderate to fair, Poor, Very Poor" />
+                <TextInput label="Alert Value (threshold)" value={draftAnalyte.alertValue} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, alertValue: v })} placeholder="e.g., 500" />
+
+                <TextInput className="md:col-span-2" label="Description (e.g., Escherichia coli)" value={draftAnalyte.description} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, description: v })} />
+                <CheckboxInput label="Italicize Description (reports)" checked={draftAnalyte.italics} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, italics: v })} />
+
+                <TextInput label="Detection Limit" value={draftAnalyte.detectionLimit} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, detectionLimit: v })} placeholder="e.g., 1 CFU/100mL" />
+                <TextInput label="Report Short Name" value={draftAnalyte.reportShortName} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, reportShortName: v })} placeholder="E. coli" />
+                <CheckboxInput label="Accredited (NATA/SAMM)" checked={draftAnalyte.accredited} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, accredited: v })} />
+
+                <TextArea className="md:col-span-3" label="Note" value={draftAnalyte.note} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, note: v })} placeholder="Specific constraints or remarks" />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button onClick={() => setShowAnalyteModal(false)} className={STYLES.btnSecondary}>Cancel</button>
+              <button type="button" onClick={saveAnalyte} className={STYLES.btnPrimary}>Save Analyte</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdornmentModal && (
+        <div className={STYLES.modal}>
+          <div className={STYLES.modalBackdrop} onClick={() => setShowAdornmentModal(false)} />
+          <div className={STYLES.modalPanel}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">Add Adornment</h3>
+              <button onClick={() => setShowAdornmentModal(false)} className={STYLES.btnSecondary}>Close</button>
+            </div>
+            <div className="p-4 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TextInput label="Key" required value={draftAdornment.key} onChange={(v) => setDraftAdornment({ ...draftAdornment, key: v })} placeholder="e.g., vol" />
+                <TextInput label="Label" required value={draftAdornment.label} onChange={(v) => setDraftAdornment({ ...draftAdornment, label: v })} placeholder="Volume" />
+                <div>
+                  <FieldLabel>Analyte</FieldLabel>
+                  <select className={STYLES.input} value={draftAdornment.analyteId} onChange={(e) => setDraftAdornment({ ...draftAdornment, analyteId: e.target.value })}>
+                    {analytes.map((a) => (
+                      <option key={a.id} value={a.id}>{`${methodCode}.${a.analyteCodeSuffix}`}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <SelectInput label="Data type" required options={DATA_TYPES} value={draftAdornment.dataType} onChange={(v) => setDraftAdornment({ ...draftAdornment, dataType: v })} />
+                <CheckboxInput label="Required" checked={draftAdornment.required} onChange={(v) => setDraftAdornment({ ...draftAdornment, required: v })} />
+                <CheckboxInput label="Show in report" checked={draftAdornment.showInReport} onChange={(v) => setDraftAdornment({ ...draftAdornment, showInReport: v })} />
+
+                {draftAdornment.showInReport && (
+                  <TextInput label="Report Short Name" value={draftAdornment.reportShortName} onChange={(v) => setDraftAdornment({ ...draftAdornment, reportShortName: v })} placeholder="Vol." />
+                )}
+
+                <TextInput className="md:col-span-3" label="Format (tokens: {label} {value})" value={draftAdornment.format} onChange={(v) => setDraftAdornment({ ...draftAdornment, format: v })} placeholder="{label}: {value}" />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button onClick={() => setShowAdornmentModal(false)} className={STYLES.btnSecondary}>Cancel</button>
+              <button type="button" onClick={saveAdornment} className={STYLES.btnPrimary}>Save Adornment</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSupportModal && (
+        <div className={STYLES.modal}>
+          <div className={STYLES.modalBackdrop} onClick={() => setShowSupportModal(false)} />
+          <div className={STYLES.modalPanel}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">Add Supporting Value</h3>
+              <button onClick={() => setShowSupportModal(false)} className={STYLES.btnSecondary}>Close</button>
+            </div>
+            <div className="p-4 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TextInput label="Key" required value={draftSupport.key} onChange={(v) => setDraftSupport({ ...draftSupport, key: v })} placeholder="e.g., temp" />
+                <TextInput label="Label" required value={draftSupport.label} onChange={(v) => setDraftSupport({ ...draftSupport, label: v })} placeholder="Incubation Temp" />
+                <StaticField label="Test Method" value={methodCode} />
+
+                <SelectInput label="Data type" required options={DATA_TYPES} value={draftSupport.dataType} onChange={(v) => setDraftSupport({ ...draftSupport, dataType: v })} />
+                <CheckboxInput label="Required" checked={draftSupport.required} onChange={(v) => setDraftSupport({ ...draftSupport, required: v })} />
+                <TextInput label="Key for calculation" required value={draftSupport.keyForCalculation} onChange={(v) => setDraftSupport({ ...draftSupport, keyForCalculation: v })} placeholder="calc_temp" />
+
+                <TextInput className="md:col-span-3" label="Format (tokens: {label} {value})" value={draftSupport.format} onChange={(v) => setDraftSupport({ ...draftSupport, format: v })} placeholder="{label}: {value}" />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button onClick={() => setShowSupportModal(false)} className={STYLES.btnSecondary}>Cancel</button>
+              <button type="button" onClick={saveSupport} className={STYLES.btnPrimary}>Save Supporting Value</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500">
         <p>Prototype only · No persistence · Fields and rules based on internal data dictionary.</p>
@@ -353,14 +585,7 @@ function TextInput({ label, value, onChange, placeholder, required, maxLength, c
       <FieldLabel>
         {label} {required && <span className="text-red-600">*</span>}
       </FieldLabel>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        className={STYLES.input}
-      />
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} className={STYLES.input} />
     </div>
   );
 }
@@ -379,14 +604,7 @@ function NumberInput({ label, value, onChange, min, max }) {
   return (
     <div>
       <FieldLabel>{label}</FieldLabel>
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        onChange={handle}
-        className={STYLES.input}
-      />
+      <input type="number" value={value} min={min} max={max} onChange={handle} className={STYLES.input} />
     </div>
   );
 }
@@ -395,13 +613,7 @@ function TextArea({ label, value, onChange, placeholder, className }) {
   return (
     <div className={className}>
       <FieldLabel>{label}</FieldLabel>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={3}
-        className={STYLES.textarea}
-      />
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={3} className={STYLES.textarea} />
     </div>
   );
 }
@@ -421,15 +633,9 @@ function SelectInput({ label, options, value, onChange, required }) {
       <FieldLabel>
         {label} {required && <span className="text-red-600">*</span>}
       </FieldLabel>
-      <select
-        className={STYLES.input}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
+      <select className={STYLES.input} value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
+          <option key={opt} value={opt}>{opt}</option>
         ))}
       </select>
     </div>
@@ -455,3 +661,17 @@ function MultiSelect({ label, options, value, onChange }) {
     </div>
   );
 }
+
+(function runInlineTests(){
+  try {
+    console.assert(computeMethodCode("7","1") === "7.1", "computeMethodCode: 7.1");
+    console.assert(computeMethodCode("","") === "—", "computeMethodCode: empty");
+    const errs1 = validateMethodAndAnalytes({codePrefix:"", codeVersion:"", name:"", shortCode:"", methodUnits:"", defaultDilutions:0, multipleMedia:false, mediaSelected:[]}, []);
+    console.assert(errs1.length >= 4, "validate: should flag required fields");
+    const errs2 = validateMethodAndAnalytes({codePrefix:"7", codeVersion:"1", name:"X", shortCode:"SPC", methodUnits:"CFU/mL", defaultDilutions:1, multipleMedia:false, mediaSelected:[]}, [{analyteCodeSuffix:"2", units:"CFU/mL"}]);
+    console.assert(errs2.length === 0, "validate: should pass valid inputs");
+    console.log("Inline tests passed");
+  } catch (e) {
+    console.error("Inline tests failed", e);
+  }
+})();
