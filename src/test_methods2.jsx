@@ -84,8 +84,18 @@ const RESULT_OPERATORS = [
   "Absent",
 ];
 
+const DATA_TYPES = [
+  "Boolean",
+  "Integer",
+  "Text",
+  "Decimal",
+  "Enum",
+  "Date time",
+  "Attachment",
+];
+
 const safeId = () =>
-  (window.crypto && typeof window.crypto.randomUUID === "function")
+  (typeof window !== "undefined" && window.crypto && typeof window.crypto.randomUUID === "function")
     ? window.crypto.randomUUID()
     : `id_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
 
@@ -131,10 +141,20 @@ export default function TestMethodDefinitionPage() {
     mediaSelected: [],
   });
 
-  const [analytes, setAnalytes] = useState([]);
+  const [analytes, setAnalytes] = useState([
+    { id: safeId(), analyteCodeSuffix: "PC", description: "Project Cost", sampleTypes: [], units: "mg/L" },
+  ]);
+
+  const [adornments, setAdornments] = useState([]);
+  const [supportingValues, setSupportingValues] = useState([]);
+
   const [activeTab, setActiveTab] = useState("Analytes");
   const [showAnalyteModal, setShowAnalyteModal] = useState(false);
+  const [showAdornmentModal, setShowAdornmentModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [draftAnalyte, setDraftAnalyte] = useState(null);
+  const [draftAdornment, setDraftAdornment] = useState(null);
+  const [draftSupport, setDraftSupport] = useState(null);
 
   const methodCode = useMemo(() => computeMethodCode(method.codePrefix, method.codeVersion), [method.codePrefix, method.codeVersion]);
 
@@ -158,6 +178,34 @@ export default function TestMethodDefinitionPage() {
     setShowAnalyteModal(true);
   };
 
+  const startAddAdornment = () => {
+    setDraftAdornment({
+      id: safeId(),
+      key: "",
+      label: "",
+      analyteId: analytes[0]?.id || "",
+      dataType: DATA_TYPES[0],
+      required: true,
+      showInReport: false,
+      reportShortName: "",
+      format: "",
+    });
+    setShowAdornmentModal(true);
+  };
+
+  const startAddSupport = () => {
+    setDraftSupport({
+      id: safeId(),
+      key: "",
+      label: "",
+      dataType: DATA_TYPES[0],
+      required: true,
+      keyForCalculation: "",
+      format: "",
+    });
+    setShowSupportModal(true);
+  };
+
   const saveAnalyte = () => {
     if (!draftAnalyte || !draftAnalyte.analyteCodeSuffix) return alert("Analyte Code is required");
     const toAdd = { ...draftAnalyte };
@@ -166,9 +214,25 @@ export default function TestMethodDefinitionPage() {
     setDraftAnalyte(null);
   };
 
-  const removeAnalyte = (id) => {
-    setAnalytes((prev) => prev.filter((a) => a.id !== id));
+  const saveAdornment = () => {
+    if (!draftAdornment || !draftAdornment.key || !draftAdornment.label || !draftAdornment.analyteId) return alert("Key, Label and Analyte are required");
+    const toAdd = { ...draftAdornment };
+    setAdornments((prev) => [...prev, toAdd]);
+    setShowAdornmentModal(false);
+    setDraftAdornment(null);
   };
+
+  const saveSupport = () => {
+    if (!draftSupport || !draftSupport.key || !draftSupport.label || !draftSupport.keyForCalculation) return alert("Key, Label and Key for calculation are required");
+    const toAdd = { ...draftSupport };
+    setSupportingValues((prev) => [...prev, toAdd]);
+    setShowSupportModal(false);
+    setDraftSupport(null);
+  };
+
+  const removeAnalyte = (id) => setAnalytes((prev) => prev.filter((a) => a.id !== id));
+  const removeAdornment = (id) => setAdornments((prev) => prev.filter((a) => a.id !== id));
+  const removeSupport = (id) => setSupportingValues((prev) => prev.filter((a) => a.id !== id));
 
   const toggleMediaSelection = (id) => {
     setMethod((m) => {
@@ -185,14 +249,13 @@ export default function TestMethodDefinitionPage() {
       return;
     }
     const payload = {
-      method: {
-        ...method,
-        codeComputed: methodCode,
-      },
-      analytes: analytes.map((a) => ({
-        ...a,
-        analyteCodeComputed: `${methodCode}.${a.analyteCodeSuffix || "0"}`,
+      method: { ...method, codeComputed: methodCode },
+      analytes: analytes.map((a) => ({ ...a, analyteCodeComputed: `${methodCode}.${a.analyteCodeSuffix || "0"}` })),
+      adornments: adornments.map((ad) => ({
+        ...ad,
+        analyteCode: analytes.find((x) => x.id === ad.analyteId)?.analyteCodeSuffix || "",
       })),
+      supportingValues,
     };
     console.log("SAVE", payload);
     alert("Saved! (Check console for payload)");
@@ -215,7 +278,9 @@ export default function TestMethodDefinitionPage() {
       multipleMedia: false,
       mediaSelected: [],
     });
-    setAnalytes([]);
+    setAnalytes([{ id: safeId(), analyteCodeSuffix: "PC", description: "Project Cost", sampleTypes: [], units: "mg/L" }]);
+    setAdornments([]);
+    setSupportingValues([]);
   };
 
   return (
@@ -262,12 +327,7 @@ export default function TestMethodDefinitionPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-1">
                     {MEDIA_OPTIONS.map((m) => (
                       <label key={m.id} className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={method.mediaSelected.includes(m.id)}
-                          onChange={() => toggleMediaSelection(m.id)}
-                        />
+                        <input type="checkbox" className="h-4 w-4" checked={method.mediaSelected.includes(m.id)} onChange={() => toggleMediaSelection(m.id)} />
                         <span className="text-sm">{m.name}</span>
                       </label>
                     ))}
@@ -281,7 +341,10 @@ export default function TestMethodDefinitionPage() {
         <section>
           <div className={STYLES.tabsBar}>
             <button className={activeTab === "Analytes" ? STYLES.tabActive : STYLES.tab} onClick={() => setActiveTab("Analytes")}>Analytes</button>
+            <button className={activeTab === "Adornments" ? STYLES.tabActive : STYLES.tab} onClick={() => setActiveTab("Adornments")}>Adornments</button>
+            <button className={activeTab === "Supporting Values" ? STYLES.tabActive : STYLES.tab} onClick={() => setActiveTab("Supporting Values")}>Supporting Values</button>
           </div>
+
           {activeTab === "Analytes" && (
             <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
               <div className="flex items-center justify-between">
@@ -312,6 +375,63 @@ export default function TestMethodDefinitionPage() {
               )}
             </div>
           )}
+
+          {activeTab === "Adornments" && (
+            <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700">Adornment List</h3>
+                <button type="button" onClick={startAddAdornment} className={STYLES.btnPrimary}>Add Adornment</button>
+              </div>
+              {adornments.length === 0 ? (
+                <p className="text-sm text-slate-500 mt-3">No adornments added yet.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {adornments.map((ad) => {
+                    const linked = analytes.find((x) => x.id === ad.analyteId);
+                    return (
+                      <li key={ad.id} className="flex items-start justify-between gap-4 rounded-md border border-slate-200 p-3">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-slate-800">{ad.label} <span className="text-slate-500">({ad.key})</span></div>
+                          <div className="text-xs text-slate-600">Type: {ad.dataType} · Required: {ad.required ? "Yes" : "No"} · Report: {ad.showInReport ? "Yes" : "No"}</div>
+                          <div className="text-xs text-slate-600">Linked analyte: {linked ? `${methodCode}.${linked.analyteCodeSuffix}` : "—"}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => removeAdornment(ad.id)} className={STYLES.btnDanger}>Remove</button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Supporting Values" && (
+            <div className="rounded-b-lg border border-slate-200 border-t-0 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700">Supporting Values</h3>
+                <button type="button" onClick={startAddSupport} className={STYLES.btnPrimary}>Add Supporting Value</button>
+              </div>
+              {supportingValues.length === 0 ? (
+                <p className="text-sm text-slate-500 mt-3">No supporting values added yet.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {supportingValues.map((sv) => (
+                    <li key={sv.id} className="flex items-start justify-between gap-4 rounded-md border border-slate-200 p-3">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-slate-800">{sv.label} <span className="text-slate-500">({sv.key})</span></div>
+                        <div className="text-xs text-slate-600">Type: {sv.dataType} · Required: {sv.required ? "Yes" : "No"}</div>
+                        <div className="text-xs text-slate-600">Key for calculation: {sv.keyForCalculation || "—"}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => removeSupport(sv.id)} className={STYLES.btnDanger}>Remove</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
       </main>
 
@@ -325,7 +445,7 @@ export default function TestMethodDefinitionPage() {
             </div>
             <div className="p-4 overflow-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <TextInput label="Analyte Code (numeric suffix)" required value={draftAnalyte.analyteCodeSuffix} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, analyteCodeSuffix: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 2" />
+                <TextInput label="Analyte Code (numeric suffix)" required value={draftAnalyte.analyteCodeSuffix} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, analyteCodeSuffix: v.replace(/[^0-9A-Za-z]/g, "") })} placeholder="e.g., 2" />
                 <StaticField label="Computed Analyte Code" value={`${methodCode}.${draftAnalyte.analyteCodeSuffix || "—"}`} />
                 <SelectInput label="Method Units" required options={UNITS} value={draftAnalyte.units} onChange={(v) => setDraftAnalyte({ ...draftAnalyte, units: v })} />
 
@@ -350,6 +470,75 @@ export default function TestMethodDefinitionPage() {
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
               <button onClick={() => setShowAnalyteModal(false)} className={STYLES.btnSecondary}>Cancel</button>
               <button type="button" onClick={saveAnalyte} className={STYLES.btnPrimary}>Save Analyte</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdornmentModal && (
+        <div className={STYLES.modal}>
+          <div className={STYLES.modalBackdrop} onClick={() => setShowAdornmentModal(false)} />
+          <div className={STYLES.modalPanel}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">Add Adornment</h3>
+              <button onClick={() => setShowAdornmentModal(false)} className={STYLES.btnSecondary}>Close</button>
+            </div>
+            <div className="p-4 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TextInput label="Key" required value={draftAdornment.key} onChange={(v) => setDraftAdornment({ ...draftAdornment, key: v })} placeholder="e.g., vol" />
+                <TextInput label="Label" required value={draftAdornment.label} onChange={(v) => setDraftAdornment({ ...draftAdornment, label: v })} placeholder="Volume" />
+                <div>
+                  <FieldLabel>Analyte</FieldLabel>
+                  <select className={STYLES.input} value={draftAdornment.analyteId} onChange={(e) => setDraftAdornment({ ...draftAdornment, analyteId: e.target.value })}>
+                    {analytes.map((a) => (
+                      <option key={a.id} value={a.id}>{`${methodCode}.${a.analyteCodeSuffix}`}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <SelectInput label="Data type" required options={DATA_TYPES} value={draftAdornment.dataType} onChange={(v) => setDraftAdornment({ ...draftAdornment, dataType: v })} />
+                <CheckboxInput label="Required" checked={draftAdornment.required} onChange={(v) => setDraftAdornment({ ...draftAdornment, required: v })} />
+                <CheckboxInput label="Show in report" checked={draftAdornment.showInReport} onChange={(v) => setDraftAdornment({ ...draftAdornment, showInReport: v })} />
+
+                {draftAdornment.showInReport && (
+                  <TextInput label="Report Short Name" value={draftAdornment.reportShortName} onChange={(v) => setDraftAdornment({ ...draftAdornment, reportShortName: v })} placeholder="Vol." />
+                )}
+
+                <TextInput className="md:col-span-3" label="Format (tokens: {label} {value})" value={draftAdornment.format} onChange={(v) => setDraftAdornment({ ...draftAdornment, format: v })} placeholder="{label}: {value}" />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button onClick={() => setShowAdornmentModal(false)} className={STYLES.btnSecondary}>Cancel</button>
+              <button type="button" onClick={saveAdornment} className={STYLES.btnPrimary}>Save Adornment</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSupportModal && (
+        <div className={STYLES.modal}>
+          <div className={STYLES.modalBackdrop} onClick={() => setShowSupportModal(false)} />
+          <div className={STYLES.modalPanel}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">Add Supporting Value</h3>
+              <button onClick={() => setShowSupportModal(false)} className={STYLES.btnSecondary}>Close</button>
+            </div>
+            <div className="p-4 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TextInput label="Key" required value={draftSupport.key} onChange={(v) => setDraftSupport({ ...draftSupport, key: v })} placeholder="e.g., temp" />
+                <TextInput label="Label" required value={draftSupport.label} onChange={(v) => setDraftSupport({ ...draftSupport, label: v })} placeholder="Incubation Temp" />
+                <StaticField label="Test Method" value={methodCode} />
+
+                <SelectInput label="Data type" required options={DATA_TYPES} value={draftSupport.dataType} onChange={(v) => setDraftSupport({ ...draftSupport, dataType: v })} />
+                <CheckboxInput label="Required" checked={draftSupport.required} onChange={(v) => setDraftSupport({ ...draftSupport, required: v })} />
+                <TextInput label="Key for calculation" required value={draftSupport.keyForCalculation} onChange={(v) => setDraftSupport({ ...draftSupport, keyForCalculation: v })} placeholder="calc_temp" />
+
+                <TextInput className="md:col-span-3" label="Format (tokens: {label} {value})" value={draftSupport.format} onChange={(v) => setDraftSupport({ ...draftSupport, format: v })} placeholder="{label}: {value}" />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button onClick={() => setShowSupportModal(false)} className={STYLES.btnSecondary}>Cancel</button>
+              <button type="button" onClick={saveSupport} className={STYLES.btnPrimary}>Save Supporting Value</button>
             </div>
           </div>
         </div>
@@ -396,14 +585,7 @@ function TextInput({ label, value, onChange, placeholder, required, maxLength, c
       <FieldLabel>
         {label} {required && <span className="text-red-600">*</span>}
       </FieldLabel>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        className={STYLES.input}
-      />
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} className={STYLES.input} />
     </div>
   );
 }
@@ -422,14 +604,7 @@ function NumberInput({ label, value, onChange, min, max }) {
   return (
     <div>
       <FieldLabel>{label}</FieldLabel>
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        onChange={handle}
-        className={STYLES.input}
-      />
+      <input type="number" value={value} min={min} max={max} onChange={handle} className={STYLES.input} />
     </div>
   );
 }
@@ -438,13 +613,7 @@ function TextArea({ label, value, onChange, placeholder, className }) {
   return (
     <div className={className}>
       <FieldLabel>{label}</FieldLabel>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={3}
-        className={STYLES.textarea}
-      />
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={3} className={STYLES.textarea} />
     </div>
   );
 }
@@ -464,15 +633,9 @@ function SelectInput({ label, options, value, onChange, required }) {
       <FieldLabel>
         {label} {required && <span className="text-red-600">*</span>}
       </FieldLabel>
-      <select
-        className={STYLES.input}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
+      <select className={STYLES.input} value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
+          <option key={opt} value={opt}>{opt}</option>
         ))}
       </select>
     </div>
@@ -499,15 +662,14 @@ function MultiSelect({ label, options, value, onChange }) {
   );
 }
 
-// lightweight browser-side tests
 (function runInlineTests(){
   try {
-    console.assert(computeMethodCode("7","1") === "7.1", "computeMethodCode failed");
-    console.assert(computeMethodCode("","") === "—", "computeMethodCode empty failed");
-    const errs1 = validateMethodAndAnalytes({codePrefix:"", codeVersion:"", name:"", shortCode:"", methodUnits:""}, []);
-    console.assert(errs1.length >= 4, "validate should flag required fields");
+    console.assert(computeMethodCode("7","1") === "7.1", "computeMethodCode: 7.1");
+    console.assert(computeMethodCode("","") === "—", "computeMethodCode: empty");
+    const errs1 = validateMethodAndAnalytes({codePrefix:"", codeVersion:"", name:"", shortCode:"", methodUnits:"", defaultDilutions:0, multipleMedia:false, mediaSelected:[]}, []);
+    console.assert(errs1.length >= 4, "validate: should flag required fields");
     const errs2 = validateMethodAndAnalytes({codePrefix:"7", codeVersion:"1", name:"X", shortCode:"SPC", methodUnits:"CFU/mL", defaultDilutions:1, multipleMedia:false, mediaSelected:[]}, [{analyteCodeSuffix:"2", units:"CFU/mL"}]);
-    console.assert(errs2.length === 0, "validate should pass valid inputs");
+    console.assert(errs2.length === 0, "validate: should pass valid inputs");
     console.log("Inline tests passed");
   } catch (e) {
     console.error("Inline tests failed", e);
