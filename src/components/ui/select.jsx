@@ -40,10 +40,12 @@ export const SelectTrigger = ({ className = "", children, ...p }) => {
 };
 
 export const SelectValue = ({ placeholder }) => {
-  const { value } = useContext(Ctx) || {};
-  return <span>{value ?? placeholder ?? ""}</span>;
-};
-
+    const { value } = useContext(Ctx) || {};
+    const showPlaceholder =
+      value === undefined || value === null || value === "" || value === "all";
+    return <span>{showPlaceholder ? (placeholder ?? "") : String(value)}</span>;
+  };
+  
 export const SelectContent = ({ children }) => {
   const { open } = useContext(Ctx) || {};
   if (!open) return null;

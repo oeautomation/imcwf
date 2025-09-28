@@ -335,8 +335,8 @@ function CouponsManagePage() {
             </Select>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-              <SelectTrigger className="w-28"><SelectValue/></SelectTrigger>
+          <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+            <SelectTrigger className="w-28"><SelectValue placeholder="Page size"/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="10">10 / page</SelectItem>
                 <SelectItem value="25">25 / page</SelectItem>
