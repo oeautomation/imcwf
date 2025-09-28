@@ -6,7 +6,6 @@ export const Select = ({ value, onValueChange, children }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e) => {
@@ -55,12 +54,12 @@ export const SelectContent = ({ children }) => {
         top: "calc(100% + 4px)",
         left: 0,
         minWidth: "100%",
-        background: "white",
+        background: "#ffffff",
         border: "1px solid #e5e7eb",
         borderRadius: 8,
         padding: 4,
         boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
-        zIndex: 1000,
+        zIndex: 2000,
       }}
       role="listbox"
     >
@@ -88,8 +87,14 @@ export const SelectItem = ({ value, children }) => {
         borderRadius: 6,
         padding: "6px 8px",
         fontSize: 14,
+        color: selected ? "#ffffff" : "#111827",      // <-- ensure visible text
         background: selected ? "#111827" : "transparent",
-        color: selected ? "white" : "inherit",
+      }}
+      onMouseEnter={(e) => {
+        if (!selected) e.currentTarget.style.background = "#f3f4f6";
+      }}
+      onMouseLeave={(e) => {
+        if (!selected) e.currentTarget.style.background = "transparent";
       }}
     >
       {children}
