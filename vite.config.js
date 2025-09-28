@@ -17,6 +17,11 @@ function htmlInputs() {
 export default defineConfig({
   base: "/imcwf/",
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   build: {
     rollupOptions: {
       input: htmlInputs(), // picks up index.html, wireframe.html, etc.
