@@ -131,6 +131,8 @@ export default function PriceBookPrototype() {
     effectiveFrom: todayISO(),
     effectiveTo: "",
     copyToCustomBooks: [], // only when adding to Standard Itemised
+    salesItemCost: "", // New field
+    retestCost: "", // New field
   });
 
   // When opening modal, default product depends on context
@@ -146,6 +148,8 @@ export default function PriceBookPrototype() {
         effectiveFrom: todayISO(),
         effectiveTo: "",
         copyToCustomBooks: [],
+        salesItemCost: "", // Default empty
+        retestCost: "", // Default empty
       });
     } else if (isCustomItemised) {
       const defaultStd = standardCatalog[0];
@@ -159,6 +163,8 @@ export default function PriceBookPrototype() {
         effectiveFrom: todayISO(),
         effectiveTo: "",
         copyToCustomBooks: [],
+        salesItemCost: defaultStd?.salesItemCost ?? "", // Copy from standard
+        retestCost: defaultStd?.retestCost ?? "", // Copy from standard
       });
     } else {
       // Bulk: treat similar to standard add, but without retest fields being relevant
@@ -172,6 +178,8 @@ export default function PriceBookPrototype() {
         effectiveFrom: todayISO(),
         effectiveTo: "",
         copyToCustomBooks: [],
+        salesItemCost: "", // Default empty
+        retestCost: "", // Default empty
       });
     }
   }
@@ -213,6 +221,8 @@ export default function PriceBookPrototype() {
         // Default applicable(s) to the standard(s) but editable
         applicablePrice: std?.standardPrice ?? "",
         applicableRetestPrice: std?.standardRetestPrice ?? "",
+        salesItemCost: std?.salesItemCost ?? "", // Copy from standard
+        retestCost: std?.retestCost ?? "", // Copy from standard
       };
     });
   }
@@ -248,6 +258,13 @@ export default function PriceBookPrototype() {
           : null,
       effectiveFrom: form.effectiveFrom || todayISO(),
       effectiveTo: form.effectiveTo || "",
+      salesItemCost: isCustomItemised
+      ? Number(standardCatalog.find((p) => p.productId === form.productId)?.salesItemCost ?? 0)
+      : form.salesItemCost === "" ? null : Number(form.salesItemCost),
+    retestCost: isCustomItemised
+      ? Number(standardCatalog.find((p) => p.productId === form.productId)?.retestCost ?? 0)
+      : form.retestCost === "" ? null : Number(form.retestCost),
+
     };
 
     // Always add to the currently active price book
@@ -479,7 +496,31 @@ export default function PriceBookPrototype() {
                   </label>
                 </>
               )}
+              {/* Sales Item Cost */}
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">Sales Item Cost</span>
+                <input
+                  type="number"
+                  className={`w-full rounded-xl border px-3 py-2 ${isCustomItemised ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                  placeholder={isCustomItemised ? "Copied from Standard" : "e.g., 100.00"}
+                  value={form.salesItemCost}
+                  onChange={(e) => !isCustomItemised && setForm({ ...form, salesItemCost: e.target.value })}
+                  readOnly={isCustomItemised} // Read-only only for Custom Price Books
+                />
+              </label>
 
+              {/* Retest Cost */}
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-700">Retest Cost</span>
+                <input
+                  type="number"
+                  className={`w-full rounded-xl border px-3 py-2 ${isCustomItemised ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                  placeholder={isCustomItemised ? "Copied from Standard" : "e.g., 50.00"}
+                  value={form.retestCost}
+                  onChange={(e) => !isCustomItemised && setForm({ ...form, retestCost: e.target.value })}
+                  readOnly={isCustomItemised} // Read-only only for Custom Price Books
+                />
+              </label>
               {/* Effective dates */}
               <label className="text-sm">
                 <span className="mb-1 block text-gray-700">Effective From</span>

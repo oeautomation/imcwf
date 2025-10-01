@@ -4,7 +4,7 @@ import CustomFrequencyWireframe from "./CustomFrequencyWireframe.jsx";
 import TestMethodDefinitionPage2 from "./test_methods2.jsx";
 import InventoryPage from "./inventory.jsx";
 import PriceBook from "./pricebook.jsx";
-
+import OtherJobs from "./otherjobs.jsx";
 function Home() {
   return (
     <div className="p-6 space-y-3">
@@ -26,6 +26,7 @@ export default function App() {
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/test-method2" element={<TestMethodDefinitionPage2 />} />
         <Route path="/pricebook" element={<PriceBook />} />
+        <Route path="/otherjobs" element={<OtherJobs />} />
       </Routes>
     </HashRouter>
   );
