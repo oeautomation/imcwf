@@ -6,7 +6,7 @@ import React, { useState } from "react";
  * Requirements handled:
  * - Contexts are tied to role type (Labs→Departments, Sample Collectors→Regions, Sales→Both)
  * - Each role shows ONLY the contexts it supports; roles with no contexts show nothing
- * - "Apply to all" button under each context copies that context to other compatible roles
+ * - "Apply to all" under each context locks compatible sections to one selected source
  * - Includes basic user details + Save button; payload is validated & logged
  */
 
@@ -55,12 +55,13 @@ const styles = {
   toggle: (on) => ({ position: "relative", width: 44, height: 24, borderRadius: 999, background: on ? "#4f46e5" : "#cbd5e1", cursor: "pointer" }),
   knob: (on) => ({ position: "absolute", top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: 999, background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 160ms" }),
   rolesWrap: { display: "flex", flexWrap: "wrap", gap: 8 },
-  chip: (active) => ({ padding: "8px 12px", borderRadius: 999, border: `1px solid ${active ? "#4f46e5" : "#e2e8f0"}`, background: active ? "#4f46e5" : "#fff", color: active ? "#fff" : "#334155", fontSize: 14, cursor: "pointer" }),
+  chip: (active, disabled = false) => ({ padding: "8px 12px", borderRadius: 999, border: `1px solid ${active ? "#4f46e5" : "#e2e8f0"}`, background: active ? "#4f46e5" : "#fff", color: active ? "#fff" : "#334155", fontSize: 14, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.55 : 1 }),
   rolePanel: { border: "1px solid #e2e8f0", borderRadius: 12, background: "#f8fafc", padding: 12 },
   roleHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   subTitle: { fontSize: 12, fontWeight: 700, margin: 0, color: "#334155" },
   rowWrap: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  subtleBtn: { fontSize: 12, color: "#4f46e5", background: "transparent", border: "none", cursor: "pointer", padding: 0 },
+  subtleBtn: (active = false) => ({ fontSize: 12, color: active ? "#fff" : "#4f46e5", background: active ? "#4f46e5" : "transparent", border: active ? "1px solid #4f46e5" : "none", borderRadius: active ? 999 : 0, cursor: "pointer", padding: active ? "4px 8px" : 0, fontWeight: active ? 700 : 400 }),
+  appliedNote: { fontSize: 12, color: "#475569", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, padding: "8px 10px", marginBottom: 8 },
   actions: { display: "flex", gap: 8, marginTop: 24, flexWrap: "wrap" },
   primaryBtn: { padding: "10px 14px", borderRadius: 12, border: "none", background: "#4f46e5", color: "#fff", fontWeight: 700, cursor: "pointer" },
   ghostBtn: { padding: "10px 14px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", color: "#0f172a", fontWeight: 700, cursor: "pointer" },
@@ -89,8 +90,8 @@ const Toggle = ({ label, checked, onChange }) => (
   </div>
 );
 
-const Chip = ({ active, onClick, children }) => (
-  <button type="button" onClick={onClick} style={styles.chip(active)}>{children}</button>
+const Chip = ({ active, onClick, disabled, children }) => (
+  <button type="button" onClick={onClick} disabled={disabled} style={styles.chip(active, disabled)}>{children}</button>
 );
 
 const Section = ({ title, children }) => (
@@ -117,6 +118,12 @@ const roleHasRegions = (role) => [
   "Sales Manager",
 ].includes(role);
 
+const getRoleContext = (map, role) => ({ departments: [], regions: [], ...(map[role] || {}) });
+
+const roleSupportsContext = (role, type) => (
+  type === "departments" ? roleHasDepartments(role) : roleHasRegions(role)
+);
+
 // --- Main component ---
 function AddUser() {
   // User details
@@ -132,45 +139,67 @@ function AddUser() {
   const [roles, setRoles] = useState([]);
   // contextMap: { [role]: { departments: string[], regions: string[] } }
   const [contextMap, setContextMap] = useState({});
+  const [appliedToAll, setAppliedToAll] = useState({ departments: null, regions: null });
 
   const toggleRole = (role) => {
-    setRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
+    const removing = roles.includes(role);
+    setRoles((prev) => (removing ? prev.filter((r) => r !== role) : [...prev, role]));
+
+    if (removing) {
+      setAppliedToAll((prev) => ({
+        departments: prev.departments === role ? null : prev.departments,
+        regions: prev.regions === role ? null : prev.regions,
+      }));
+      return;
+    }
+
+    setContextMap((prev) => {
+      const next = { ...prev };
+      ["departments", "regions"].forEach((type) => {
+        const sourceRole = appliedToAll[type];
+        if (sourceRole && roleSupportsContext(role, type)) {
+          next[role] = {
+            ...getRoleContext(next, role),
+            [type]: [...getRoleContext(next, sourceRole)[type]],
+          };
+        }
+      });
+      return next;
+    });
   };
 
-  const ensureRoleObj = (role) => ({ departments: [], regions: [], ...(contextMap[role] || {}) });
+  const ensureRoleObj = (role) => getRoleContext(contextMap, role);
+
+  const copyContextToCompatibleRoles = (map, sourceRole, type) => {
+    const src = getRoleContext(map, sourceRole)[type];
+    const next = { ...map };
+    roles.forEach((r) => {
+      if (roleSupportsContext(r, type)) {
+        next[r] = { ...getRoleContext(next, r), [type]: [...src] };
+      }
+    });
+    return next;
+  };
 
   const toggleContextValue = (role, type, code) => {
+    if (appliedToAll[type] && appliedToAll[type] !== role) return;
+
     setContextMap((prev) => {
-      const existing = ensureRoleObj(role);
+      const existing = getRoleContext(prev, role);
       const list = existing[type] || [];
       const updatedList = list.includes(code) ? list.filter((c) => c !== code) : [...list, code];
-      return { ...prev, [role]: { ...existing, [type]: updatedList } };
+      const next = { ...prev, [role]: { ...existing, [type]: updatedList } };
+      return appliedToAll[type] === role ? copyContextToCompatibleRoles(next, role, type) : next;
     });
   };
 
   // Apply-to-all (per context type) from a source role → copy to other compatible roles
-  const applyDepartmentsToAll = (sourceRole) => {
-    const src = ensureRoleObj(sourceRole).departments;
-    setContextMap((prev) => {
-      const next = { ...prev };
-      roles.forEach((r) => {
-        if (r === sourceRole) return;
-        if (roleHasDepartments(r)) next[r] = { ...ensureRoleObj(r), departments: [...src] };
-      });
-      return next;
-    });
-  };
-
-  const applyRegionsToAll = (sourceRole) => {
-    const src = ensureRoleObj(sourceRole).regions;
-    setContextMap((prev) => {
-      const next = { ...prev };
-      roles.forEach((r) => {
-        if (r === sourceRole) return;
-        if (roleHasRegions(r)) next[r] = { ...ensureRoleObj(r), regions: [...src] };
-      });
-      return next;
-    });
+  const toggleApplyToAll = (sourceRole, type) => {
+    const alreadyApplied = appliedToAll[type] === sourceRole;
+    setAppliedToAll((prev) => ({ ...prev, [type]: alreadyApplied ? null : sourceRole }));
+    if (!alreadyApplied) {
+      setContextMap((prev) => copyContextToCompatibleRoles(prev, sourceRole, type));
+    }
   };
 
   // Save
@@ -241,6 +270,12 @@ function AddUser() {
                   const showDepts = roleHasDepartments(role);
                   const showRegs = roleHasRegions(role);
                   if (!showDepts && !showRegs) return null; // hide section if role doesn't support contexts
+                  const deptAppliedSource = appliedToAll.departments;
+                  const regionAppliedSource = appliedToAll.regions;
+                  const isDeptSource = deptAppliedSource === role;
+                  const isRegionSource = regionAppliedSource === role;
+                  const isDeptLocked = Boolean(deptAppliedSource);
+                  const isRegionLocked = Boolean(regionAppliedSource);
                   return (
                     <div key={role} style={styles.rolePanel}>
                       <div style={styles.roleHeader}>
@@ -251,11 +286,24 @@ function AddUser() {
                         <div style={{ marginTop: 8 }}>
                           <div style={styles.rowWrap}>
                             <h5 style={styles.subTitle}>Departments</h5>
-                            <button type="button" style={styles.subtleBtn} onClick={() => applyDepartmentsToAll(role)} title="Copy to all roles that use Departments">Apply to all</button>
+                            <button
+                              type="button"
+                              style={styles.subtleBtn(isDeptSource)}
+                              onClick={() => toggleApplyToAll(role, "departments")}
+                              title={isDeptSource ? "Stop applying Departments to all compatible roles" : "Apply these Departments to all compatible roles"}
+                            >
+                              {isDeptSource ? "Applied to all" : "Apply to all"}
+                            </button>
                           </div>
+                          {isDeptSource && (
+                            <div style={styles.appliedNote}>Applied to all departments</div>
+                          )}
+                          {isDeptLocked && !isDeptSource && (
+                            <div style={styles.appliedNote}>Applied to all departments</div>
+                          )}
                           <div style={styles.rolesWrap}>
                             {DEPT_OPTIONS.map((d) => (
-                              <Chip key={d.code} active={ensureRoleObj(role).departments.includes(d.code)} onClick={() => toggleContextValue(role, "departments", d.code)}>
+                              <Chip key={d.code} active={ensureRoleObj(role).departments.includes(d.code)} disabled={isDeptLocked} onClick={() => toggleContextValue(role, "departments", d.code)}>
                                 {d.name}
                               </Chip>
                             ))}
@@ -267,11 +315,24 @@ function AddUser() {
                         <div style={{ marginTop: 12 }}>
                           <div style={styles.rowWrap}>
                             <h5 style={styles.subTitle}>Regions</h5>
-                            <button type="button" style={styles.subtleBtn} onClick={() => applyRegionsToAll(role)} title="Copy to all roles that use Regions">Apply to all</button>
+                            <button
+                              type="button"
+                              style={styles.subtleBtn(isRegionSource)}
+                              onClick={() => toggleApplyToAll(role, "regions")}
+                              title={isRegionSource ? "Stop applying Regions to all compatible roles" : "Apply these Regions to all compatible roles"}
+                            >
+                              {isRegionSource ? "Applied to all" : "Apply to all"}
+                            </button>
                           </div>
+                          {isRegionSource && (
+                            <div style={styles.appliedNote}>Applied to all regions</div>
+                          )}
+                          {isRegionLocked && !isRegionSource && (
+                            <div style={styles.appliedNote}>Applied to all regions</div>
+                          )}
                           <div style={styles.rolesWrap}>
                             {REGION_OPTIONS.map((r) => (
-                              <Chip key={r.code} active={ensureRoleObj(role).regions.includes(r.code)} onClick={() => toggleContextValue(role, "regions", r.code)}>
+                              <Chip key={r.code} active={ensureRoleObj(role).regions.includes(r.code)} disabled={isRegionLocked} onClick={() => toggleContextValue(role, "regions", r.code)}>
                                 {r.name}
                               </Chip>
                             ))}
@@ -299,6 +360,7 @@ function AddUser() {
                 setSignatureFileName("");
                 setRoles([]);
                 setContextMap({});
+                setAppliedToAll({ departments: null, regions: null });
                 setErrors({});
               }}
             >

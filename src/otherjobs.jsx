@@ -8,7 +8,7 @@ const JOB_TYPES = ["Microbiology", "AWT", "Environs", "Miscellaneous"]; // Misc 
 const CATEGORY_BY_JOBTYPE = {
   Microbiology: ["Food", "Water"],
   AWT: ["Chemical","Corrosion","Regular AWT category placeholder"],
-  Environs: ["Environmental","Regular ENV category placeholder"],
+  Environs: ["IEQ","IAQ","Regular ENV category placeholder"],
   Miscellaneous: ["Miscellaneous"],
 };
 
@@ -18,7 +18,8 @@ const SAMPLE_TYPES_BY_CATEGORY = {
   Chemical: ["Chemical Analysis"],
   Food: ["Food Swab", "Ingredients", "Beverages"],
   Water: ["CT", "Pool/SPA", "PW", "WF"],
-  Environmental: ["IAQ", "IEQ", "Swab"],
+  IEQ: ["CT", "Pool/SPA", "PW"],
+  IAQ: ["CT", "Pool/SPA", "PW"],
   Miscellaneous: ["sample type placeholder"],
   "Regular ENV category placeholder": ["samples placeholder"],
     "Regular AWT category placeholder": ["samples placeholder"],
@@ -159,7 +160,7 @@ export default function JobRegistrationPrototype() {
                 {!isProject && !isSubcontract &&category === "Regular ENV category placeholder" && <li ><strong>Workflow</strong> Regular workflow is selected</li>}
                 {!isProject && !isSubcontract &&category === "Regular AWT category placeholder" && <li ><strong>Workflow</strong> Regular workflow is selected</li>}
                 {!isProject && !isSubcontract &&(category === "Corrosion"||category === "Chemical") && <li ><strong>Workflow</strong> Corrosion workflow is selected</li>}
-                {!isProject && !isSubcontract &&category === "Environmental" && <li ><strong>Workflow</strong> IAQ workflow is selected</li>}
+                {!isProject && !isSubcontract &&(category === "IEQ"||category === "IAQ") && <li ><strong>Workflow</strong> IAQ workflow is selected</li>}
 
               </ul>
             </div>

@@ -10,7 +10,12 @@ import DataEntry from "./data-entry.jsx";
 import SearchCollector from "./search_collector.jsx";
 import AddUser from "./adduser2.jsx";
 import UserRoles from "./user-roles.jsx";
-
+import Aquisition from "./AcquisitionRequestWizard.jsx";
+import Deployment from "./deployment.jsx"
+import QuotationDetailsPage from "./quote.jsx";
+import Detections from "./detections.jsx";
+import Media from "./media.jsx";
+import JobCategories from "./job_categories.jsx";
 
 function Home() {
   return (
@@ -26,8 +31,10 @@ function Home() {
       <Link className="underline text-indigo-600" to="/search-collector">Search Collector</Link><br/>
       <Link className="underline text-indigo-600" to="/add-user">Add User</Link><br/>
       <Link className="underline text-indigo-600" to="/user-roles">User Role Management</Link><br/>
-
-
+      <Link className="underline text-indigo-600" to="/Quotations">Quotation Details</Link><br/>
+      <Link className="underline text-indigo-600" to="/Detections">Detections</Link><br/>
+      <Link className="underline text-indigo-600" to="/Media">Test Method with Media Support</Link><br/>
+      <Link className="underline text-indigo-600" to="/Job_categories">Job Category Configuration</Link><br/>
     </div>
   );
 }
@@ -48,6 +55,12 @@ export default function App() {
         <Route path="/search-collector" element={<SearchCollector />} />
         <Route path="/add-user" element={<AddUser />} />
         <Route path="/user-roles" element={<UserRoles />} />
+        <Route path="/aquisition" element={<Aquisition />} />
+        <Route path="/deployment" element={<Deployment />} />
+        <Route path="/quotations" element={<QuotationDetailsPage />} />
+        <Route path="/detections" element={<Detections />} />
+        <Route path="/media" element={<Media />} />
+        <Route path="/job_categories" element={<JobCategories />} />
       </Routes>
     </HashRouter>
   );
